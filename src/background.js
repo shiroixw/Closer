@@ -22,6 +22,7 @@ const FILES = [
 const ALL_ORIGINS = { origins: ['*://*/*'] };
 
 // canvas 上限约 16384 px/边，再大的图复制必然失败，不如根本不传输。
+// 与 src/content/bytes.js 的同名常量是一件事，改一处必须改另一处（无构建，无法共享）。
 const MAX_BYTES = 64 * 1024 * 1024;
 
 /* ---------- 注册 ---------- */
@@ -130,7 +131,11 @@ async function readBytes(url, want) {
     return { ok: true, size, mime };
   }
 
+  // 先看声明长度：为了拒绝一张图而先下载 64 MB，等于把拒绝的代价付了两遍。
+  if (declared > MAX_BYTES) return { ok: true, size: declared, mime, tooBig: true };
+
   const bytes = new Uint8Array(await res.arrayBuffer());
+  // 头可以撒谎或者缺失，读了之后必须再判一次
   if (bytes.byteLength > MAX_BYTES) {
     return { ok: true, size: bytes.byteLength, mime, tooBig: true };
   }

@@ -90,7 +90,7 @@ $('backdrop').addEventListener('click', async (e) => {
   }
 
   const got = await chrome.storage.local.get(PREFS_KEY);
-  const prefs = { backdrop: 'dark', ...(got[PREFS_KEY] || {}), backdrop: b.dataset.v };
+  const prefs = { ...(got[PREFS_KEY] || {}), backdrop: b.dataset.v };
   await chrome.storage.local.set({ [PREFS_KEY]: prefs });
 });
 

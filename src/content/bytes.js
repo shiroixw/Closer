@@ -6,6 +6,7 @@ var Closer = (window.Closer ||= {});
 // 只缓存最近一条：用户一次只可能看一张图，做 LRU 是给自己找 bug。
 
 const TIMEOUT = 8000;
+// 与 src/background.js 的同名常量是一件事，改一处必须改另一处（无构建，无法共享）。
 const MAX_BYTES = 64 * 1024 * 1024;
 
 let lastUrl = '';
