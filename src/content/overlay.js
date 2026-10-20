@@ -48,9 +48,13 @@ Closer.overlay = (function () {
 .photo{position:absolute;inset:0;margin:auto;display:block;max-width:none;max-height:none;
   transform-origin:center center;cursor:grab;user-select:none;will-change:transform}
 .photo.dragging{cursor:grabbing}
+/* bar 本体不接点击：它是整条顶部横带，会吞掉「点背板关闭」。只有按钮是命中区 */
 .bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
-  padding:12px 14px;transition:opacity ${ms(180)}ms ease;opacity:1}
-.bar.idle{opacity:0;pointer-events:none}
+  padding:12px 14px;pointer-events:none;transition:opacity ${ms(180)}ms ease;opacity:1}
+.bar.idle{opacity:0}
+.bar button{pointer-events:auto}
+/* 隐身时不可点：看得见才点得到，不留看不见的按钮 */
+.bar.idle button{pointer-events:none}
 .actions{display:flex;gap:4px}
 button{all:unset;box-sizing:border-box;display:grid;place-items:center;cursor:pointer;color:inherit;
   border-radius:9px;background:rgba(24,24,27,.62);backdrop-filter:blur(8px);
@@ -109,11 +113,11 @@ button:hover{background:rgba(63,63,70,.9)}
         <img class="photo" alt="" draggable="false">
       </div>
       <div class="bar">
-        <button class="info" aria-label="Image info" aria-expanded="false">i</button>
+        <button class="info" aria-label="Image info" title="Image info (I)" aria-expanded="false">i</button>
         <div class="actions">
-          <button class="act copy" aria-label="Copy image">${COPY_SVG}</button>
-          <button class="act save" aria-label="Save image">${SAVE_SVG}</button>
-          <button class="act close" aria-label="Close">${CLOSE_SVG}</button>
+          <button class="act copy" aria-label="Copy image" title="Copy image (⇧ click: copy address)">${COPY_SVG}</button>
+          <button class="act save" aria-label="Save image" title="Save image">${SAVE_SVG}</button>
+          <button class="act close" aria-label="Close" title="Close (Esc)">${CLOSE_SVG}</button>
         </div>
       </div>
       <div class="panel" hidden>
@@ -151,8 +155,8 @@ button:hover{background:rgba(63,63,70,.9)}
     photo.addEventListener('dblclick', onDblClick);
     photo.addEventListener('error', () => close(true)); // 空黑幕比没有更糟（6.8）
 
-    bar.addEventListener('pointerenter', () => clearTimeout(hideTimer));
-    bar.addEventListener('pointerleave', wake);
+    // 不再用 bar 的 pointerenter/leave：bar 本体是 pointer-events:none，收不到事件。
+    // 悬停与唤回统一由 onMove 里的 hover() 负责。
   }
 
   /* ---------- 坐标 ---------- */
@@ -305,6 +309,26 @@ button:hover{background:rgba(63,63,70,.9)}
     hideTimer = setTimeout(() => bar.classList.add('idle'), HIDE_DELAY);
   }
 
+  /**
+   * 指针一动就把 chrome 唤回来（设计 5.2）。
+   * 只挂在 onMove 里，不新增监听器（宪法第六条：加载期监听预算是 2 个）。
+   * 节流 80 ms：pointermove 一秒能来几百条，唤回一次就够。
+   */
+  let lastHover = 0;
+  function hover(e) {
+    const t = performance.now();
+    if (t - lastHover < 80) return;
+    lastHover = t;
+
+    // 停在按钮上时不淡出：取消计时器，且不重设
+    if (e.composedPath().includes(bar)) {
+      bar.classList.remove('idle');
+      clearTimeout(hideTimer);
+      return;
+    }
+    wake();
+  }
+
   function setBackdrop(name) {
     const next = BACKDROPS.includes(name) ? name : 'dark';
     host.classList.remove(...BACKDROPS);
@@ -342,8 +366,11 @@ button:hover{background:rgba(63,63,70,.9)}
   }
 
   function onMove(e) {
+    if (state !== 'open') return;
+
+    hover(e); // 唤回 chrome；拖拽时它同时负责保持可见
+
     if (!drag || e.pointerId !== drag.id) return;
-    wake();
 
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;

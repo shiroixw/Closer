@@ -21,13 +21,51 @@ var Closer = (window.Closer ||= {});
     setTimeout(run, 32);
   }
 
+  /**
+   * 按下那一刻的现场。click 只能告诉我们「点完了」，
+   * 而「这是不是一次点击」必须在按下时就记下来——选区在 mousedown 时就被折叠了，
+   * 到 click 再问一定得到空字符串。
+   */
+  let down = null;
+
+  const DRAG_SLOP = 6; // 位移超过 6 px 是在拖，不是在点
+  const HOLD_MS = 600; // 按住超过 600 ms 是在读，不是在点
+
+  function idle() {
+    return Closer.state.ready && !Closer.isPaused() && !Closer.overlay.isOpen();
+  }
+
+  function onPointerDown(e) {
+    down = null;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!idle()) return;
+
+    let sel = false;
+    try {
+      sel = !!String(getSelection() || '').trim();
+    } catch {
+      /* 拿不到选区就当没有，按第二条偏向打开 */
+    }
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), sel };
+  }
+
   function onClick(e) {
+    const d = down;
+    down = null;
+
     if (e.button !== 0) return;
     // 带修饰键的点击是用户明确要走别的路径（⌘ 开新标签页等），一律放行
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
-    if (!Closer.state.ready || Closer.isPaused()) return;
-    if (Closer.overlay.isOpen()) return;
+    if (!idle()) return;
+
+    // 拖了一下、按了很久、或者按下时正选着字：都不是「看这张图」
+    if (d) {
+      if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) return;
+      if (performance.now() - d.t > HOLD_MS) return;
+      if (d.sel) return;
+    }
 
     const target = e.composedPath()[0];
     const img = target instanceof Element ? target.closest('img') : null;
@@ -42,6 +80,8 @@ var Closer = (window.Closer ||= {});
   }
 
   Closer.load().finally(() => {
+    // 宪法第六条：加载期最多 2 个监听。这就是全部两个。
+    addEventListener('pointerdown', onPointerDown, true);
     addEventListener('click', onClick, true);
   });
 })();
