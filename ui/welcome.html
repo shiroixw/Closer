@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Closer</title>
+<link rel="stylesheet" href="ui.css">
+
+<div class="wide">
+  <h1>Closer</h1>
+  <p>Click any image to view it full size, in place, at its real dimensions.</p>
+
+  <div class="row" style="margin-top:22px">
+    <span>Site access</span>
+    <button id="perm" class="primary">Allow on all sites</button>
+  </div>
+  <p class="note" style="margin-top:8px">
+    Closer needs to see every page to decide which images are worth opening — that's the whole product.
+    It reads nothing else: no page text, no form values, no history, no cookies. No network requests, no analytics.
+    You can revoke this here or from <code>chrome://extensions</code> at any time.
+  </p>
+
+  <div class="row" style="margin-top:22px">
+    <span>Paused sites</span>
+    <span class="host" id="count" style="color:var(--dim)">—</span>
+  </div>
+  <ul id="list"></ul>
+  <p class="note" id="empty">Nothing paused. When a site has its own viewer or gets in the way, hit <strong>Pause on …</strong> inside the info panel.</p>
+</div>
+
+<script src="welcome.js"></script>

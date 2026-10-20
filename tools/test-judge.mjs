@@ -1,0 +1,88 @@
+// judge() 的单元测试。纯函数，所以不需要浏览器。
+// 每条规则至少一个反例——不能失败的测试没有意义。
+
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+const SRC = new URL('../src/content/detect.js', import.meta.url);
+const src = fs.readFileSync(SRC, 'utf8');
+
+const ctx = { window: {} };
+vm.createContext(ctx);
+vm.runInContext(src, ctx);
+const judge = ctx.window.Closer.judge;
+
+// 桩：closest 只认「这个节点身上挂了哪些选择器片段」。
+// 真实选择器按逗号拆开后，正好都是这些片段。
+// href 给出时，closest('a') 返回一个能被 getAttribute 读到的锚点。
+function img({ nw = 800, nh = 600, w = 400, h = 300, closest = [], href } = {}) {
+  const set = new Set(closest);
+  const anchor = href === undefined ? null : { getAttribute: (n) => (n === 'href' ? href : null) };
+  const node = {
+    naturalWidth: nw,
+    naturalHeight: nh,
+    getBoundingClientRect: () => ({ width: w, height: h }),
+    closest(selector) {
+      if (!selector) return null;
+      const parts = selector.split(',').map((s) => s.trim());
+      if (anchor && parts.includes('a')) return anchor;
+      for (const part of parts) {
+        if (set.has(part)) return node;
+      }
+      return null;
+    },
+  };
+  return node;
+}
+
+const cases = [
+  ['正常的大图', img(), true],
+  ['尚未解码（懒加载占位）', img({ nw: 0, nh: 0 }), false],
+  ['渲染尺寸 30×30（头像）', img({ w: 30, h: 30 }), false],
+  ['原始 150×150（二维码）', img({ nw: 150, nh: 150 }), false],
+  ['原始 1000×40（横幅）', img({ nw: 1000, nh: 40, w: 1000, h: 40 }), false],
+  ['[data-closer-ignore]', img({ closest: ['[data-closer-ignore]'] }), false],
+  ['按钮里的图', img({ closest: ['button'] }), false],
+  ['role=button 里的图', img({ closest: ['[role="button"]'] }), false],
+  ['页头 60px 高的 logo', img({ w: 400, h: 60, closest: ['header'] }), false],
+  ['页头里的大图', img({ w: 400, h: 300, closest: ['header'] }), true],
+  ['a[download] 里的图', img({ closest: ['a[download]'] }), false],
+  ['商品链接里的图', img({ closest: ['a'], href: '/product/1234' }), false],
+  ['链接指向图片本身', img({ closest: ['a'], href: '/assets/photo.webp' }), true],
+  ['data-lightbox 图集', img({ closest: ['[data-lightbox]'] }), false],
+  ['rel=lightbox 链接', img({ closest: ['a[rel~="lightbox"]'] }), false],
+  ['已打开的对话框里', img({ closest: ['dialog[open]'] }), false],
+  ['裸锚点 a[href="#"]', img({ closest: ['a'], href: '#' }), true],
+  ['无 href 的 a', img({ closest: ['a'], href: '' }), false],
+  ['图片直链带查询串', img({ closest: ['a'], href: '/assets/photo.JPG?w=800' }), true],
+];
+
+let pass = 0;
+const fails = [];
+
+for (const [name, node, want] of cases) {
+  let got;
+  try {
+    got = judge(node);
+  } catch (e) {
+    got = `抛错 ${e.message}`;
+  }
+  if (got === want) {
+    pass++;
+  } else {
+    fails.push(`${name}：期望 ${want}，得到 ${got}`);
+  }
+}
+
+const pad = (s, n) => s + ' '.repeat(Math.max(0, n - [...s].length));
+for (const [name, , want] of cases) {
+  const bad = fails.find((f) => f.startsWith(name + '：'));
+  console.log(`${bad ? '✗' : '✓'} ${pad(name, 26)} ${bad ? bad.split('：')[1] : '→ ' + want}`);
+}
+
+console.log(`\n${pass}/${cases.length} 通过`);
+if (fails.length) {
+  console.log('\n失败项：');
+  for (const f of fails) console.log('  ' + f);
+}
+process.exit(fails.length ? 1 : 0);

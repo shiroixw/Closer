@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Closer</title>
+<link rel="stylesheet" href="ui.css">
+
+<h1>Closer</h1>
+<p id="status"><span class="dot off"></span><span id="statusText">Checking…</span></p>
+
+<div class="row" id="permRow" hidden>
+  <span class="host">Needs site access</span>
+  <button id="perm" class="primary">Allow</button>
+</div>
+
+<div class="row">
+  <span class="host" id="host">—</span>
+  <button id="pause" disabled>Pause</button>
+</div>
+
+<div class="row">
+  <span>Backdrop</span>
+  <span class="seg" id="backdrop">
+    <button data-v="dark" aria-pressed="true">Dark</button>
+    <button data-v="light" aria-pressed="false">Light</button>
+    <button data-v="checker" aria-pressed="false">Checker</button>
+  </span>
+</div>
+
+<p class="note">Click any image to see it full size. <strong>Pause</strong> turns Closer off for this site only.</p>
+
+<script src="popup.js"></script>

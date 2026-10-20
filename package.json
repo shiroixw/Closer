@@ -1,0 +1,16 @@
+{
+  "name": "closer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Closer — click any image to view it full size. 本文件只提供测试入口，不参与打包：产物就是 src/ 里的源码本身（宪法第五条）。",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "verify": "node tools/check-manifest.mjs && node tools/test-judge.mjs",
+    "check": "node tools/check-manifest.mjs",
+    "test": "node tools/test-judge.mjs",
+    "smoke": "node tools/lab/e4-overlay.mjs"
+  }
+}

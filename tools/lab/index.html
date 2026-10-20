@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Closer — E1 实验页</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 32px 28px 80px;
+    background: #0b0b0c; color: #e8e8ea;
+    font: 400 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { margin: 0 0 6px; font-size: 18px; font-weight: 500; }
+  .lede { margin: 0 0 24px; color: #9a9aa0; max-width: 720px; }
+  .lede code { color: #b5d4f4; font-family: ui-monospace, monospace; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card {
+    border: 1px solid #26262a; border-radius: 12px; padding: 14px;
+    background: #111113; display: flex; flex-direction: column; gap: 10px;
+  }
+  .card h3 { margin: 0; font-size: 13px; font-weight: 500; }
+  .card h3 span { color: #6f6f76; font-weight: 400; }
+  .card .exp { margin: 0; font-size: 12px; color: #9a9aa0; }
+  .card .exp b { color: #9fe1cb; font-weight: 500; }
+  .frame {
+    display: grid; place-items: center; min-height: 90px;
+    border-radius: 8px; overflow: hidden; background: #08080a;
+  }
+  .frame img { max-width: 100%; height: auto; display: block; }
+  .frame button { border: 0; padding: 0; background: none; cursor: pointer; }
+
+  .bar { display: flex; gap: 10px; align-items: center; margin: 28px 0 14px; }
+  button.run {
+    font: inherit; color: #0b0b0c; background: #9fe1cb; border: 0;
+    border-radius: 8px; padding: 8px 14px; cursor: pointer;
+  }
+  button.run:hover { background: #b8ecd9; }
+  .hint { color: #6f6f76; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #1e1e22; }
+  th { color: #8f8f96; font-weight: 500; font-size: 12px; }
+  td.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+  .ok { color: #9fe1cb; }
+  .bad { color: #f0997b; }
+  .warn { color: #fac775; }
+
+  .fake-viewer { position: fixed; inset: 0; z-index: 9998; display: grid; place-items: center;
+    background: rgba(0, 0, 0, .92); cursor: zoom-out; }
+  .fake-viewer img { max-width: 90vw; max-height: 88vh; }
+</style>
+</head>
+<body>
+
+<h1>Closer — E1 实验页</h1>
+<p class="lede">
+  八个受控场景，用来标定「页面动过了没有」的判据。页面底部脚本会自动加载
+  <code>../probe-yield.js</code>，每次点击都会被归到某一类。
+  点「运行全部」会按顺序依次点击每一张图，并在下表里给出<b>期望 vs 实际</b>。
+</p>
+
+<div class="grid" id="cases"></div>
+
+<div class="bar">
+  <button class="run" id="runAll">运行全部</button>
+  <button class="run" id="reset" style="background:#2c2c2a;color:#e8e8ea">清空记录</button>
+  <span class="hint">按顺序点一遍约 13 秒</span>
+</div>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>场景</th><th>期望</th><th>实际</th><th>acted / late / viewer</th><th>判定</th></tr>
+  </thead>
+  <tbody id="report"><tr><td colspan="6" style="color:#6f6f76">还没跑过</td></tr></tbody>
+</table>
+
+<script src="../probe-yield.js"></script>
+<script>
+(() => {
+  const CASES = [
+    { id: 'c1', title: '纯图，无处理器', expect: 'open-ok', w: 800, h: 1000 },
+    { id: 'c2', title: '同步打开的假查看器', expect: 'yield-ok', w: 800, h: 500, on: 'sync' },
+    { id: 'c3', title: '800ms 后才开的查看器', expect: 'late-yield', w: 800, h: 500, on: 'async' },
+    { id: 'c4', title: 'cursor:zoom-in，无处理器', expect: 'open-ok', w: 800, h: 600, cursor: 'zoom-in' },
+    { id: 'c5', title: '图片包在商品链接里', expect: 'judge-skip', w: 800, h: 600, wrap: 'a' },
+    { id: 'c6', title: '24×24 图标', expect: 'judge-skip', w: 24, h: 24 },
+    { id: 'c7', title: '150×150 二维码', expect: 'judge-skip', w: 150, h: 150, qr: true },
+    { id: 'c8', title: '按钮里的图', expect: 'judge-skip', w: 600, h: 400, wrap: 'button' },
+  ];
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function photoUri(w, h, label, tone) {
+    let lines = '';
+    for (let i = 1; i < 10; i++) lines += `<line x1="0" y1="${(h / 10) * i}" x2="${w}" y2="${(h / 10) * i}"/>`;
+    for (let i = 1; i < 7; i++) lines += `<line x1="${(w / 7) * i}" y1="0" x2="${(w / 7) * i}" y2="${h}"/>`;
+    const fs = Math.max(13, Math.round(Math.min(w, h) / 9));
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<rect width="${w}" height="${h}" fill="${tone || '#2b3a4a'}"/>` +
+      `<g stroke="#fff" stroke-opacity=".12" stroke-width="1">${lines}</g>` +
+      `<text x="${w / 2}" y="${h / 2}" fill="#fff" fill-opacity=".92" font-family="system-ui" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${label}</text>` +
+      `<text x="${w / 2}" y="${h / 2 + fs * 1.4}" fill="#fff" fill-opacity=".45" font-family="ui-monospace,monospace" font-size="${Math.round(fs * 0.55)}" text-anchor="middle" dominant-baseline="middle">${w} × ${h}</text>` +
+      `</svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  function qrUri(size) {
+    const n = 21;
+    const cell = size / n;
+    let seed = 20261020;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    let rects = '';
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const inFinder = (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+        let on;
+        if (inFinder) {
+          const lx = x >= n - 7 ? x - (n - 7) : x;
+          const ly = y >= n - 7 ? y - (n - 7) : y;
+          on = lx === 0 || lx === 6 || ly === 0 || ly === 6 || (lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4);
+        } else {
+          on = rnd() > 0.55;
+        }
+        if (on) rects += `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}"/>`;
+      }
+    }
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
+      `<rect width="${size}" height="${size}" fill="#fff"/><g fill="#111">${rects}</g></svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  function openViewer(src) {
+    closeViewer();
+    const v = document.createElement('div');
+    v.className = 'fake-viewer';
+    const im = document.createElement('img');
+    im.src = src;
+    v.appendChild(im);
+    v.addEventListener('click', closeViewer, true);
+    document.body.appendChild(v);
+  }
+  function closeViewer() {
+    document.querySelectorAll('.fake-viewer').forEach((n) => n.remove());
+  }
+
+  function build() {
+    const host = document.getElementById('cases');
+    for (const c of CASES) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.id = c.id;
+
+      const h = document.createElement('h3');
+      h.textContent = c.title;
+      const sub = document.createElement('span');
+      sub.textContent = '  ' + c.id;
+      h.appendChild(sub);
+
+      const exp = document.createElement('p');
+      exp.className = 'exp';
+      exp.innerHTML = '期望 <b>' + c.expect + '</b>';
+
+      const frame = document.createElement('div');
+      frame.className = 'frame';
+
+      const img = document.createElement('img');
+      img.src = c.qr ? qrUri(c.w) : photoUri(c.w, c.h, c.id.toUpperCase(), c.id === 'c6' ? '#4a2b2b' : undefined);
+      if (c.cursor) img.style.cursor = c.cursor;
+      img.alt = c.id;
+
+      let node = img;
+      if (c.wrap === 'a') {
+        const a = document.createElement('a');
+        a.href = 'https://example.com/product';
+        a.addEventListener('click', (e) => e.preventDefault());
+        a.appendChild(img);
+        node = a;
+      } else if (c.wrap === 'button') {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.appendChild(img);
+        node = b;
+      }
+
+      if (c.on === 'sync') node.addEventListener('click', () => openViewer(img.src));
+      if (c.on === 'async') node.addEventListener('click', () => setTimeout(() => openViewer(img.src), 800));
+
+      frame.appendChild(node);
+      card.append(h, exp, frame);
+      host.appendChild(card);
+    }
+  }
+
+  async function clickCase(c) {
+    closeViewer();
+    const card = document.getElementById(c.id);
+    card.scrollIntoView({ block: 'center' });
+    await wait(150);
+    const img = card.querySelector('img');
+    const r = img.getBoundingClientRect();
+    const o = {
+      bubbles: true, cancelable: true, view: window, button: 0,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+    };
+    img.dispatchEvent(new PointerEvent('pointerdown', o));
+    img.dispatchEvent(new MouseEvent('click', o));
+    await wait(1600);
+  }
+
+  let startIndex = 0;
+
+  async function runAll() {
+    startIndex = window.__closer ? window.__closer.rows.length : 0;
+    for (const c of CASES) await clickCase(c);
+    closeViewer();
+    render();
+    return report();
+  }
+
+  function report() {
+    const rows = window.__closer ? window.__closer.rows.slice(startIndex) : [];
+    return CASES.map((c, i) => {
+      const r = rows[i] || {};
+      const actual = r.guess || '(无记录)';
+      return {
+        case: c.id, expect: c.expect, actual,
+        acted: r.acted || '-', late: r.late || '-', viewer: r.viewer || '-',
+        why: r.why || '',
+        pass: actual === c.expect,
+      };
+    });
+  }
+
+  function render() {
+    const data = report();
+    const body = document.getElementById('report');
+    body.innerHTML = '';
+    for (const d of data) {
+      const tr = document.createElement('tr');
+      const cells = [
+        [d.case, 'mono'],
+        [CASES.find((c) => c.id === d.case).title],
+        [d.expect, 'mono'],
+        [d.actual + (d.why ? ' · ' + d.why : ''), 'mono'],
+        [d.acted + ' / ' + d.late + ' / ' + d.viewer, 'mono'],
+        [d.pass ? '✓' : '✗', d.pass ? 'ok' : 'bad'],
+      ];
+      for (const [text, cls] of cells) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        if (cls) td.className = cls;
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+    const failed = data.filter((d) => !d.pass).length;
+    const sum = document.createElement('tr');
+    sum.innerHTML = '<td colspan="6" class="' + (failed ? 'bad' : 'ok') + '">' +
+      (failed ? failed + ' 项不符合期望' : '全部 ' + data.length + ' 项符合期望') + '</td>';
+    body.appendChild(sum);
+  }
+
+  document.getElementById('runAll').addEventListener('click', runAll);
+  document.getElementById('reset').addEventListener('click', () => {
+    if (window.__closer) window.__closer.rows.length = 0;
+    startIndex = 0;
+    document.getElementById('report').innerHTML =
+      '<tr><td colspan="6" style="color:#6f6f76">已清空</td></tr>';
+  });
+
+  build();
+  window.lab = { runAll, render, report, CASES };
+})();
+</script>
+</body>
+</html>

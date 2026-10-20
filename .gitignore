@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# WorkBuddy 本地记忆，不进仓库
+.workbuddy
