@@ -21,7 +21,7 @@
 | 1 | 刚装完 | 自动打开一个 welcome 页，说明要什么权限、为什么 | `onInstalled` 没触发，或 welcome 路径写错 |
 | 2 | 点 welcome 上的 **Enable Closer** | 弹出 Chrome 权限确认：「读取和更改您在所有网站上的数据」 | `optional_host_permissions` 没生效 |
 | 3 | 点「允许」 | 按钮变成已启用状态；**已打开的那个标签页不用刷新就能用**（可以手动刷新一次作对照） | 权限拿到了但 content script 没注册，或没向已开标签页补注入 |
-| 4 | 点浏览器工具栏图标 | popup 显示当前站点、启用状态、三个背景选项 | popup 里读状态失败 |
+| 4 | 点浏览器工具栏图标 | popup 显示当前站点、启用状态、三个背景选项；**已授权时不该出现「Needs site access」那一行** | popup 里读状态失败，或 `[hidden]` 被 `.row` 的 `display:flex` 盖掉（曾经如此） |
 
 ## 二、看图本身
 

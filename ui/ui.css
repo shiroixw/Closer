@@ -12,6 +12,11 @@
 
 * { box-sizing: border-box; }
 
+/* UA 的 [hidden]{display:none} 特异性只有 (0,1,0)，任何带 display 的类都会盖掉它。
+   `.row{display:flex}` 就是这么让「授权后隐藏 Needs site access」失效的：
+   JS 一直在设 hidden，只是没有视觉效果。 */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   padding: 14px;
