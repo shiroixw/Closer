@@ -37,6 +37,7 @@ function paint() {
 
   const isPaused = paused.some((e) => covers(e, host));
   hostEl.textContent = host || t('thisPage');
+  hostEl.title = host; // 窄窗里会被截断成省略号，完整站点名留在 tooltip 上
   pauseBtn.textContent = isPaused ? t('resume') : t('pause');
   pauseBtn.disabled = !host;
 }

@@ -28,6 +28,7 @@ async function render() {
     const li = document.createElement('li');
     const name = document.createElement('span');
     name.textContent = site;
+    name.title = site; // 长站点名截断后，完整值在这里
 
     const del = document.createElement('button');
     del.textContent = t('resume');

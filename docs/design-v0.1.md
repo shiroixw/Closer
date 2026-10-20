@@ -214,10 +214,12 @@ Pause on example.com ← 12 px，悬停变亮
 
 ```
 manifest.json
+_locales/
+  en/ zh_CN/           两种语言的文案（D28）
 src/
   background.js        注册、权限同步、字节取回
   content/
-    core.js            命名空间、偏好缓存、暂停列表
+    core.js            命名空间、文案（Closer.t）、偏好缓存、暂停列表
     detect.js          judge()
     yield.js           让位检测与迟到纠正
     meta.js            尺寸、比例、格式
@@ -228,6 +230,7 @@ src/
   ui/
     popup.html/.js     按站点暂停、授权
     welcome.html/.js   首次运行、暂停列表
+    i18n.js            扩展页面的文案入口（content 侧不用它）
     ui.css
 icons/
 tools/icons.py         图标渲染器（PNG 的来源）

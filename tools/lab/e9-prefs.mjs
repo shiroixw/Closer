@@ -198,6 +198,36 @@ check(
   permRow ? `hidden=${permRow.hidden} display=${permRow.display} · ${permRow.status}` : '读不到 permRow'
 );
 
+/* ---------- 1b. 超长站点名不许把按钮挤成两行 ---------- */
+// popup 被当成标签页打开时，activeHost() 拿到的是 32 位扩展 id，正好是最长的单 token。
+// 修之前：站点名的 min-content 撑住 flex 项不肯变窄，按钮被挤到一个字宽，中文逐字折行。
+const rowFit = await popup.ev(`(() => {
+  const btn = document.getElementById('pause');
+  const host = document.getElementById('host');
+  const b = btn.getBoundingClientRect();
+  const h = host.getBoundingClientRect();
+  const r = btn.closest('.row').getBoundingClientRect();
+  return {
+    btnH: Math.round(b.height),
+    btnRight: Math.round(b.right),
+    btnLeft: Math.round(b.left),
+    hostRight: Math.round(h.right),
+    rowRight: Math.round(r.right),
+    host: host.textContent,
+  };
+})()`);
+
+check(
+  '长站点名：暂停按钮仍是单行',
+  rowFit && rowFit.btnH <= 34, // 单行 ≈ 31px（12px 字号 + 5+5 内边距 + 2 边框），两行会到 ~49
+  rowFit ? `高 ${rowFit.btnH}px · ${rowFit.host}` : '读不到 pause 按钮'
+);
+check(
+  '长站点名：按钮不出框、站点名让位',
+  rowFit && rowFit.btnRight <= rowFit.rowRight + 1 && rowFit.hostRight <= rowFit.btnLeft,
+  rowFit ? `按钮右 ${rowFit.btnRight} / 行右 ${rowFit.rowRight} · 站点名右 ${rowFit.hostRight} / 按钮左 ${rowFit.btnLeft}` : '读不到几何'
+);
+
 /* ---------- 2. 打开一张图，默认 dark ---------- */
 
 const spot = await page.ev(`(() => {
