@@ -296,8 +296,17 @@ const esc = async () => {
 
 await page.send('Page.bringToFront');
 await esc();
-await sleep(450);
-check('Esc 关闭后 host 已摘除', (await page.ev("!document.getElementById('closer')")) === true);
+
+// 轮询而不是固定等一下：退场动画 260ms + teardown 兜底 400ms，
+// 连跑多个测试时机器一忙，固定 sleep 就会假红（曾经如此）。
+const gone = async () => {
+  for (let i = 0; i < 30; i++) {
+    if ((await page.ev("!document.getElementById('closer')")) === true) return true;
+    await sleep(50);
+  }
+  return false;
+};
+check('Esc 关闭后 host 已摘除', (await gone()) === true);
 
 await clickAt(spot.x, spot.y);
 await sleep(600);
