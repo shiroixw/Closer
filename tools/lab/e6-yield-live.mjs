@@ -79,7 +79,12 @@ const PAGE = `<!doctype html>
 <style>
   body { margin: 0; padding: 30px; background: #fafafa; font: 13px system-ui; }
   .case { margin-bottom: 28px; }
-  .case img { width: 420px; display: block; cursor: pointer; }
+  /* 正文图不声明 cursor：真实站点里「可点」通常来自外层 <a> 或容器的事件委托，
+     不是给 <img> 自己设 pointer。给了 pointer 就等于声明「这块是交互区域」，
+     新判据会直接让我们让位（见下面 card 用例）。 */
+  .case img { width: 420px; display: block; }
+  /* 声明成可点区域的卡片：新判据要拦住它 */
+  .case.clickable img { cursor: pointer; }
   .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 99999;
     display: grid; place-items: center; }
   .lightbox img { width: 80vw; height: 80vh; object-fit: contain; }
@@ -89,6 +94,7 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>plain — 没有任何处理器</h3><img id="plain" src="/photo.png" alt="plain"></div>
 <div class="case"><h3>sync — 点击同步挂查看器</h3><img id="sync" src="/photo.png" alt="sync"></div>
 <div class="case"><h3>late — 800ms 后才挂查看器</h3><img id="late" src="/photo.png" alt="late"></div>
+<div class="case clickable"><h3>card — 图片被声明成可点区域</h3><img id="card" src="/photo.png" alt="card"></div>
 
 <script>
 function viewer() {
@@ -280,6 +286,15 @@ const lateTheirs = await hasLightbox();
 check('L1 页面还没动手时我们先打开', lateEarly === true);
 check('L2 站点慢挂查看器后，我们自己关掉', lateAfter === false);
 check('L3 站点查看器保留', lateTheirs === true);
+
+/* --- card：图片被声明成可点区域 --- */
+
+await reload();
+await clickImage('card');
+await sleep(600);
+const cardOurs = await has();
+check('C1 cursor:pointer 声明的可点区域：不接管', cardOurs === false);
+check('C2 也没有给页面留下任何东西', (await hasLightbox()) === false);
 
 /* ---------- 收尾 ---------- */
 

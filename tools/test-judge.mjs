@@ -7,7 +7,12 @@ import vm from 'node:vm';
 const SRC = new URL('../src/content/detect.js', import.meta.url);
 const src = fs.readFileSync(SRC, 'utf8');
 
-const ctx = { window: {} };
+// judge() 现在会摸 getComputedStyle（cursor 判据），桩里给一个只看 __cursor 的假实现。
+const ctx = {
+  window: {},
+  document: { body: {}, documentElement: {} },
+  getComputedStyle: (n) => ({ cursor: n?.__cursor || 'auto' }),
+};
 vm.createContext(ctx);
 vm.runInContext(src, ctx);
 const judge = ctx.window.Closer.judge;
@@ -15,12 +20,15 @@ const judge = ctx.window.Closer.judge;
 // 桩：closest 只认「这个节点身上挂了哪些选择器片段」。
 // 真实选择器按逗号拆开后，正好都是这些片段。
 // href 给出时，closest('a') 返回一个能被 getAttribute 读到的锚点。
-function img({ nw = 800, nh = 600, w = 400, h = 300, closest = [], href } = {}) {
+// cursor / parentCursor 用来构造 cursor:pointer 的继承链。
+function img({ nw = 800, nh = 600, w = 400, h = 300, closest = [], href, cursor = 'auto', parentCursor } = {}) {
   const set = new Set(closest);
   const anchor = href === undefined ? null : { getAttribute: (n) => (n === 'href' ? href : null) };
   const node = {
     naturalWidth: nw,
     naturalHeight: nh,
+    __cursor: cursor,
+    parentElement: parentCursor ? { __cursor: parentCursor, parentElement: null } : null,
     getBoundingClientRect: () => ({ width: w, height: h }),
     closest(selector) {
       if (!selector) return null;
@@ -55,6 +63,11 @@ const cases = [
   ['裸锚点 a[href="#"]', img({ closest: ['a'], href: '#' }), true],
   ['无 href 的 a', img({ closest: ['a'], href: '' }), false],
   ['图片直链带查询串', img({ closest: ['a'], href: '/assets/photo.JPG?w=800' }), true],
+  // 卡片：H5 活动页把整块做成 section + JS 事件委托，点击后只改自己的文字/class，
+  // 让位检测完全看不见。图片本身 pointer 是继承来的，声明的边界在父容器上。
+  ['配置卡片的横幅图（cursor 继承自容器）', img({ cursor: 'pointer', parentCursor: 'pointer' }), false],
+  ['图片自己声明 cursor:pointer', img({ cursor: 'pointer' }), false],
+  ['普通正文图', img({ cursor: 'auto' }), true],
 ];
 
 let pass = 0;
