@@ -70,6 +70,7 @@ function makePng(w, h) {
   ]);
 }
 const PNG = makePng(900, 700);
+const SQUARE = makePng(300, 300); // 二维码 / 头像的典型尺寸
 
 /* ---------- 页面 ---------- */
 
@@ -95,6 +96,7 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>sync — 点击同步挂查看器</h3><img id="sync" src="/photo.png" alt="sync"></div>
 <div class="case"><h3>late — 800ms 后才挂查看器</h3><img id="late" src="/photo.png" alt="late"></div>
 <div class="case clickable"><h3>card — 图片被声明成可点区域</h3><img id="card" src="/photo.png" alt="card"></div>
+<div class="case"><h3>square — 正方形小图（二维码 / 头像）</h3><img id="square" src="/square.png" alt="square"></div>
 
 <script>
 function viewer() {
@@ -113,9 +115,10 @@ document.getElementById('late').addEventListener('click', () => { setTimeout(vie
 
 const server = http
   .createServer((req, res) => {
-    if (req.url.startsWith('/photo.png')) {
-      res.writeHead(200, { 'content-type': 'image/png', 'content-length': PNG.length, 'cache-control': 'no-store' });
-      return res.end(PNG);
+    const img = req.url.startsWith('/square.png') ? SQUARE : req.url.startsWith('/photo.png') ? PNG : null;
+    if (img) {
+      res.writeHead(200, { 'content-type': 'image/png', 'content-length': img.length, 'cache-control': 'no-store' });
+      return res.end(img);
     }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(PAGE);
@@ -295,6 +298,13 @@ await sleep(600);
 const cardOurs = await has();
 check('C1 cursor:pointer 声明的可点区域：不接管', cardOurs === false);
 check('C2 也没有给页面留下任何东西', (await hasLightbox()) === false);
+
+/* --- square：正方形小图（二维码 / 头像） --- */
+
+await reload();
+await clickImage('square');
+await sleep(600);
+check('Q1 正方形小图不被接管', (await has()) === false);
 
 /* ---------- 收尾 ---------- */
 

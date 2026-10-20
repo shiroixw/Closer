@@ -68,6 +68,12 @@ const cases = [
   ['配置卡片的横幅图（cursor 继承自容器）', img({ cursor: 'pointer', parentCursor: 'pointer' }), false],
   ['图片自己声明 cursor:pointer', img({ cursor: 'pointer' }), false],
   ['普通正文图', img({ cursor: 'auto' }), true],
+  // 正方形小图：二维码、头像。门槛 600，代价是正方形插画被一起跳过（D25）。
+  ['250×250 二维码', img({ nw: 250, nh: 250, w: 250, h: 250 }), false],
+  ['400×400 头像', img({ nw: 400, nh: 400, w: 300, h: 300 }), false],
+  ['599×599（仍然算小正方形）', img({ nw: 599, nh: 599, w: 300, h: 300 }), false],
+  ['600×600 不小了，照常打开', img({ nw: 600, nh: 600, w: 400, h: 400 }), true],
+  ['800×800 正方形大图（可能是作品）', img({ nw: 800, nh: 800, w: 400, h: 400 }), true],
 ];
 
 let pass = 0;

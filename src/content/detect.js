@@ -19,6 +19,7 @@ const KNOWN_VIEWER =
 const MIN_RENDER = 40; // 渲染后的边长下限：图标、头像、sprite
 const MIN_AREA = 40000; // 原始面积下限，约 200 × 200
 const MIN_SIDE = 48; // 原始短边下限：横幅、分割线、长条
+const SQUARE_MAX = 600; // 正方形小图的上限：二维码、头像几乎都在这条线以下
 
 Closer.judge = function (img) {
   // 1 还没解码。懒加载占位符就走这条。
@@ -61,10 +62,14 @@ Closer.judge = function (img) {
   if (img.closest(KNOWN_VIEWER)) return false;
   if (img.closest('dialog[open],[role="dialog"][aria-modal="true"]')) return false;
 
-  // 11 祖先链上有一块自己声明了 cursor:pointer 的区域：设计者把它做成了可点区域。
+  // 11 正方形小图：二维码、头像。点他是想扫它、或者看这个人，不是想看这张图。
+  //    代价写在 D25：500 × 500 的正方形插画会被一起跳过。
+  if (nw === nh && nw < SQUARE_MAX) return false;
+
+  // 12 祖先链上有一块自己声明了 cursor:pointer 的区域：设计者把它做成了可点区域。
   if (clickBox(img)) return false;
 
-  // 12 其余：打开。
+  // 13 其余：打开。
   return true;
 };
 
