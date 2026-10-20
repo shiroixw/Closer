@@ -11,6 +11,7 @@
 **2026-10-20 一轮优化**：视图层修三处（chrome 唤不回、顶栏吞点击、复制不可发现）、点击契约补上设计 §3.1 的三条放行规则、纯函数补测 31 条、E8 从「外网站点诊断」改成「自包含桩页面回归」。
 **同日第二轮**：popup 授权后仍显示 Allow（`[hidden]` 被 `.row` 盖掉）、popup 换背板时已打开的图不跟着变（新增 E9）、窄窗口下大图偏右下并被裁（`margin:auto` 在溢出时不生效）、E5/E7/E8/E9 全部固定视口（点击类测试此前会因窗口大小假红）、E5 的还原判据从整页长度改为指向自身痕迹。
 **同日第三轮（bad case）**：H5 活动页的整块可点卡片被接管 → 判断器新增 `cursor:pointer`（认声明边界，D24）与正方形小图（D25）两条，e6 加 card / square 用例；把「让位检测回答不了只改文字/class 的点击」这个盲区写进 design §4 与 §8。
+**同日第四轮（发布前清账）**：`npm run verify` 在 Windows 上必然 ENOENT（`tools/` 把 `URL.pathname` 当路径，拼出 `D:\D:\…`）——两处已改回 `path.resolve`；`check-manifest` 新增「content 侧顶层声明撞名」检查，补上逐文件 `node --check` 结构上永远看不见的那类错误；`bytes` 的 meta 缓存不再钉住失败；复制大图加像素闸，超限降级为复制地址（D26）；shadow host 去掉 `aria-modal`（D27）。
 **同日补机制**：新增 `docs/cases.md` 案例台账（含一条「静态无解、不修」的记录），宪法第二条加「检验二」——上一次误接管是什么形态、为什么不在台账里。缺的不是规则，是发现机制。
 
 代码写完了，131 项自动断言全绿。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
@@ -19,10 +20,10 @@
 
 | 验收 | 结果 |
 |---|---|
-| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、判断器 27/27、尺寸与文件名 31/31） |
+| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、判断器 27/27、尺寸与文件名 31/31、顶层声明 27 个无撞名） |
 | `npm run smoke` | ✅ 28/28（e4 桩测 13 + e6 让位与可点区域 10 + e7 速度预算 5） |
 | `npm run live` | ✅ 45/45（e5 真实站点 25 + e8 三主题 13 + e9 偏好与居中 7） |
-| content 侧体积 | ✅ **43.2 KB / 60 KB**（余量 16.8 KB） |
+| content 侧体积 | ✅ **46.2 KB / 60 KB**（余量 13.8 KB） |
 | 速度（CPU 4×） | ✅ judge **0.005 ms** · 首帧 **22.1 ms** · 加载期 **2 个**监听（用满第六条的预算） |
 
 ## 模块状态
@@ -36,7 +37,7 @@
 | 尺寸比例格式 | `src/content/meta.js` | ✅ | `test-meta` 31/31（含 fileName） |
 | 字节通道 | `src/content/bytes.js` + `src/background.js` | ✅ 真图已通 | e5：面板显示 `WEBP · 58 KB` |
 | 视图层 overlay | `src/content/overlay.js` | ✅ | e4：开、transform 生效、背板淡入、Esc 后 host 摘除、DOM 逐字节一致 |
-| 复制 / 保存 | `src/content/actions.js` | ✅ 代码 / ⚠️ 剪贴板未验 | 需真人点（合成事件没有瞬时激活） |
+| 复制 / 保存 | `src/content/actions.js` | ✅ 代码 / ⚠️ 剪贴板未验 | 需真人点（合成事件没有瞬时激活）；单边 > 16384 或 > 32 MP 时降级为复制地址（D26），这条路径同样要真人验 |
 | popup | `ui/popup.html` + `popup.js` | ✅ | 授权、按站点暂停、背景三选一；已授权时权限行不可见（e9） |
 | 偏好跨上下文同步 | `core.js` + `overlay.js` | ✅ | popup 点按钮 → storage → 已打开的背板立刻换（e9 6/6） |
 | welcome | `ui/welcome.html` + `welcome.js` | ✅ | 授权说明、暂停列表增删 |
@@ -59,6 +60,8 @@
 | T10 | 视图层三处：chrome 唤回、顶栏吞点击、复制 tooltip | 淡出后指针一动就回来；顶部空白处点击能关闭；`⇧` 复制地址可见 | ✅ 已修，e4 13/13 + e5 24/24 未回归；手感由 manual-check 11/12 验 |
 | T11 | 纯函数补测（ratio / humanBytes / formatOf / fileName / meta） | `npm run verify` 含 31 条断言 | ✅ 31/31 |
 | T12 | popup 换背板 → 已打开的 overlay 立刻生效 | 点按钮后不等下次点击就变；关掉重开仍生效 | ✅ e9 6/6（真扩展 + 真授权 + 真按钮点击） |
+| T13 | `verify` 在 Windows 上可跑 | `npm run verify` 三件事全绿，不出现 `D:\D:\…` | ✅ 2026-10-20 本机实测 |
+| T14 | 跨文件顶层声明撞名纳入 `verify` | 注入一次重名 → 退出码 1 并指名两个文件 | ✅ 临时注入 `PAUSED_KEY` 验证，还原后重新变绿 |
 
 ## 中断规则（这条最重要）
 
@@ -84,7 +87,8 @@
 | B1 | ~~v0.1 代码未提交~~ | 已在 commit 中存档 | ✅ 已解决 |
 | B2 | E2–E8 需要 CDP 端口，未纳入 `verify` | 让位与视图质量靠手动跑 `smoke` / `live` | 作者决定是否接 CI |
 | B3 | 隐私政策页（申请 all-urls 前必须有） | 上架前置 | 延后 |
-| B4 | ~~content 侧余量不足~~ | 预算 40 → 60 KB 后余量 22.3 KB | ✅ 已解决（D21） |
+| B4 | ~~content 侧余量不足~~ | 预算 40 → 60 KB 后余量 13.8 KB（46.2 KB / 60 KB） | ✅ 已解决（D21） |
+| B6 | **`smoke` / `live` 未在 Windows 上复跑** | e4 的路径修复只做了语法与逻辑核对，没在真实 CDP 下跑过一轮；e4 现在读的是 `join(ROOT, 'src/content', file)`，本机没有开 9333 的 Chrome 无法验证 | 作者，装一次 Chrome 调试端口后跑 `npm run smoke` |
 | B5 | **手工验收未做**（`docs/manual-check.md` 12 条） | 授权链路、剪贴板、真实站点让位都只有代码，没有一次真人走通 | 作者，约五分钟 |
 
 ## 本轮修掉的 bug（都留下了断言）
@@ -109,3 +113,8 @@
 | **临时扩展实例无限堆积**：e5/e6 每次 `mkdtemp` 一个新目录，unpacked 扩展的 id 由路径决定，于是每跑一次就永久多一个实例（堆到 8 个）。这些实例会往 `*://*/*` 注入，包括 e4 的 `127.0.0.1` 桩页面，同一次点击上两个实例抢活，让 e4 报出「overlay 没打开」这种完全误导的失败 | 浏览器截图里看到 8 个 Closer | e4「环境干净：页面上只有一个 overlay」；e5/e6 改用固定路径并在结束时卸载 |
 | **迟到纠正永远不触发**：`covered()` 用 `elementFromPoint`，而 overlay 自己是 fixed + 最高 z-index，取到的永远是我们自己，站点在下面挂查看器完全看不见 | e6 的 `late` 场景（先开、800ms 后站点挂查看器、再等 1.5s 没关） | e6「L2 站点慢挂查看器后，我们自己关掉」 |
 | `ms(1)` 误当 reduced-motion 判据 | 读代码 | — |
+| **`npm run verify` 在 Windows 上必然失败**：`tools/check-manifest.mjs`、`tools/lab/e4-overlay.mjs` 用 `new URL('..', import.meta.url).pathname` 当根目录 | 本机跑 verify，ENOENT `D:\D:\Programming\Closer\manifest.json`。`pathname` 是 `/D:/…`，`path.join` 又加了一遍盘符 | 两处改为 `path.resolve(import.meta.dirname, …)`；`decisions.md` 的「默认假设」记下「路径一律由 path API 生成」 |
+| **跨文件顶层 `const` 撞名，`verify` 结构上查不出** | 读 `core.js` 注释时确认：8 个 content 文件共用一个全局词法环境，重名是 SyntaxError，而第 4 节是逐文件 `node --check` | `check-manifest` 新增第 5 节；临时注入 `const PAUSED_KEY` 验证会失败并指名 `core.js + detect.js`，还原后变绿 |
+| **复制大图可能把标签页 OOM 掉**：`MAX_BYTES` 管字节不管像素，64 MB 的 JPEG 能解出 300 MP（约 1.2 GB RGBA） | 读复制链路时发现的预算错配：唯一的兜底是 `toBlob` 返回 null，而那时像素缓冲已经分配了 | `toPng` 建 canvas 前判单边 16384 / 面积 32 MP，超限退回复制地址并 toast（D26） |
+| **`aria-modal="true"` 与「不抢焦点」自相矛盾** | 读 `ensure()`：声明了模态，却把 `tabIndex` 设为 -1 且从不 focus | 去掉 `aria-modal`，只留 `role="dialog"`（D27），代价写进 decisions |
+| **meta 缓存把一次失败钉死** | `bytes.js` 的 `lastMeta` 是 Promise，resolve(null) 仍然 truthy，于是同一 URL 之后永远命中失败缓存 | 失败时清空 `lastUrl` / `lastMeta`；下次打开同一张图会重新探测 |

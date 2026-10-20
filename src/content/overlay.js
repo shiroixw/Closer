@@ -100,7 +100,9 @@ button:hover{background:rgba(63,63,70,.9)}
     host = document.createElement('div');
     host.id = 'closer';
     host.setAttribute('role', 'dialog');
-    host.setAttribute('aria-modal', 'true');
+    // 不写 aria-modal：模态语义要求焦点进入对话框，而第三条禁止抢焦点
+    // （页面能观测到 blur 的地方，视频会暂停、编辑器会失焦）。
+    // 撒谎的 ARIA 比没有 ARIA 更糟，所以这里退成非模态 dialog。
     host.setAttribute('aria-label', 'Image viewer');
     host.tabIndex = -1; // 不 focus：键位靠 window capture，不需要焦点（6.7）
 
@@ -261,7 +263,10 @@ button:hover{background:rgba(63,63,70,.9)}
       } else {
         const got = await Closer.bytes(m.url, 'full');
         if (!got?.buf) throw new Error('bytes');
-        await Closer.copyImage(got);
+        // 太大时降级成地址：拿到的东西变了，就得说出来（5.4）
+        if ((await Closer.copyImage(got, m.url)) === 'address') {
+          say('Too large to copy — address copied');
+        }
       }
       flash(copyBtn);
     } catch {

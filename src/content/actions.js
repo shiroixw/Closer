@@ -5,12 +5,21 @@ var Closer = (window.Closer ||= {});
 // 复制与保存。都复用 bytes 取回的内容，不再发第二次请求。
 // blob 必须在页面里造：SW 造的 blob:chrome-extension:// 页面加载不了。
 
+// canvas 按像素收费，不按字节：64 MB 的 JPEG 能解出 300 MP，一次要 1.2 GB 的 RGBA，
+// 标签页直接被系统杀掉——比「复制失败」难看得多。所以这里有两道闸，
+// 超了不硬来，退回复制地址（降级必须说出来，静默降级等于骗人）。
+const MAX_SIDE = 16384; // Chrome 的 canvas 单边上限
+const MAX_PIXELS = 32e6; // 约 32 MP：8000×4000 之下，中间缓冲约 128 MB
+
 async function toPng(buf, mime) {
   const src = URL.createObjectURL(new Blob([buf], { type: mime || 'application/octet-stream' }));
   try {
     const img = new Image();
     img.src = src;
     await img.decode();
+
+    const { naturalWidth: w, naturalHeight: h } = img;
+    if (w > MAX_SIDE || h > MAX_SIDE || w * h > MAX_PIXELS) return null;
 
     const canvas = document.createElement('canvas');
     canvas.width = img.naturalWidth;
@@ -25,10 +34,20 @@ async function toPng(buf, mime) {
   }
 }
 
-/** 复制图片本身（PNG）。动图会变成静态帧——需要动画请用保存。 */
-Closer.copyImage = async function (media) {
+/**
+ * 复制图片本身（PNG）。动图会变成静态帧——需要动画请用保存。
+ * 返回 'image' | 'address'：像素超出 canvas 预算时退回复制地址，
+ * 由调用方把这次降级讲出来。
+ */
+Closer.copyImage = async function (media, url) {
   const png = await toPng(media.buf, media.mime);
+  if (!png) {
+    if (!url) throw new Error('no-url');
+    await Closer.copyText(url);
+    return 'address';
+  }
   await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+  return 'image';
 };
 
 Closer.copyText = (text) => navigator.clipboard.writeText(text);

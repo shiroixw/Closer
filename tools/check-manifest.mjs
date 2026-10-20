@@ -4,10 +4,13 @@
 // 而浏览器不会告诉你「少了哪四个图标」。让人肉去看是浪费，让脚本看是零成本。
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// 不能用 new URL('..', import.meta.url).pathname：Windows 上它是 /D:/Programming/Closer/，
+// 再交给 path.join 会拼成 D:\D:\Programming\...，整个 verify 直接 ENOENT。
+// 文件系统路径只能由 path API 生成。
+const ROOT = resolve(import.meta.dirname, '..');
 const manifest = JSON.parse(readFileSync(join(ROOT, 'manifest.json'), 'utf8'));
 
 const errors = [];
@@ -110,8 +113,40 @@ for (const f of [...jsFiles, ...(existsSync(bgPath) ? [bgPath] : [])]) {
   }
 }
 
+// ── 5. content 侧共用同一个全局词法环境，顶层声明不得撞名 ──
+// 无构建的代价：8 个文件按 manifest 顺序注入同一个隔离世界。
+// 顶层 const 重名是 SyntaxError（整份 content 脚本不执行，页面完全没反应）；
+// function 重名是静默覆盖（后者赢，行为取决于文件名顺序）。
+// 而第 4 节是逐文件 node --check，结构上永远看不见跨文件冲突——
+// 只有装上真扩展才炸，且 Chrome 把错误指向第二个文件，与真正改错的地方无关。
+// 唯一允许共享的名字是命名空间 Closer（每个文件都写一次 var）。
+const SHARED = new Set(['Closer']);
+const DECL = /^(?:async\s+)?(?:const|let|var|class|function)\s+([A-Za-z_$][\w$]*)/;
+
+const bgSrc = existsSync(bgPath) ? readFileSync(bgPath, 'utf8') : '';
+const injected = [...bgSrc.matchAll(/['"](src\/content\/[\w.-]+\.js)['"]/g)].map((m) => m[1]);
+const owners = new Map();
+for (const rel of injected) {
+  const full = join(ROOT, rel);
+  if (!existsSync(full)) continue;
+  for (const line of readFileSync(full, 'utf8').split(/\r?\n/)) {
+    const m = DECL.exec(line); // 行首锚定：缩进的都是函数内部的局部声明
+    if (!m || SHARED.has(m[1])) continue;
+    if (!owners.has(m[1])) owners.set(m[1], []);
+    owners.get(m[1]).push(rel);
+  }
+}
+const clashes = [...owners].filter(([, files]) => files.length > 1);
+if (clashes.length) {
+  errors.push(
+    `content 侧顶层声明重名 ${clashes.length} 处（共用全局作用域，装上真扩展才会炸）：\n    ` +
+      clashes.map(([name, files]) => `${name} ← ${files.join(' + ')}`).join('\n    ')
+  );
+}
+
 // ── 输出 ────────────────────────────────────────────────
 for (const w of warnings) console.log(`· ${w}`);
+console.log(`· content 顶层声明 ${owners.size} 个，来源 ${injected.length} 个注入文件${clashes.length ? '（有重名）' : ''}`);
 if (errors.length) {
   console.error('\n✗ 契约检查未通过：');
   for (const e of errors) console.error(`  - ${e}`);

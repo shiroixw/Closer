@@ -10,11 +10,13 @@
 import http from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
+import { join, resolve } from 'node:path';
 import { clean } from './clean-extensions.mjs';
 
 const PORT = 8824;
 const CDP = process.env.CDP || 'http://127.0.0.1:9333';
-const ROOT = new URL('../../', import.meta.url).pathname;
+// 同 check-manifest：URL.pathname 在 Windows 上是 /D:/...，拼出来是 D:\D:\...
+const ROOT = resolve(import.meta.dirname, '../..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- 造图 ---------- */
@@ -133,7 +135,7 @@ const server = http
     if (url.startsWith('/js/')) {
       const file = url.slice(4).replace(/[^a-z.]/gi, '');
       try {
-        const js = readFileSync(ROOT + 'src/content/' + file);
+        const js = readFileSync(join(ROOT, 'src/content', file));
         res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
         return res.end(js);
       } catch {

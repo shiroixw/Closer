@@ -206,7 +206,9 @@ background → content   { ok: true, size, mime, base64?, tooBig? }
 
 ### 5.2 内存
 
-完整字节（base64 → `Uint8Array`）只在复制/保存期间存在，用完即弃，不挂在 overlay 上。超过 64 MB 返回 `tooBig`：这个体积的图用 canvas 转 PNG 也会失败，不如早点讲清楚。
+完整字节（base64 → `Uint8Array`）只在复制/保存期间存在，用完即弃，不挂在 overlay 上。超过 64 MB 返回 `tooBig`，复制报 `Copy failed`。
+
+**字节之外还有一道像素闸。** 64 MB 管不住像素：64 MB 的 JPEG 能解出 300 MP，画进 canvas 要 1.2 GB 的 RGBA，标签页会被 OOM 杀掉。所以 `toPng` 在 `img.decode()` 之后、建 canvas 之前判两道：单边 ≤ 16384（Chrome 的 canvas 上限）、总面积 ≤ 32 MP。超限返回 `null`，`copyImage` 退回复制地址并 toast —— 见 D26。保存不受影响，它走原始字节，不经 canvas。
 
 ### 5.3 两种 URL 不走 SW
 
@@ -357,9 +359,11 @@ URL.revokeObjectURL(url);
 - **`blob:` 是同源的**，所以跨域图片经它中转后画进 canvas 不会被污染。这是整条链路能成立的原因，也是不该直接从页面里的 `<img>` 读像素的原因。已实测（E3）。
 - **blob 必须在页面里造，不能在 service worker 里造。** SW 创建的 URL 是 `blob:chrome-extension://<id>/...`，和页面不同源，`<img src>` 直接加载失败（除非把 Blob 塞进 `web_accessible_resources`，那又多一层暴露面）。正确流程是 SW 只回传 `ArrayBuffer`，由 content script 自己 `new Blob(...)` + `createObjectURL`，URL 就落在页面 origin 上。
 - **瞬时激活**（transient activation）有 5 秒窗口，且不会因为 `await` 而失效。所以「点 → 取字节 → 转 PNG → 写剪贴板」是安全的，只要别在里面插用户确认弹窗。
-- **canvas 有尺寸上限**（Chrome 约 16384 px/边，总面积也有上限）。超了 `toBlob` 返回 `null`，按失败处理。
+- **canvas 有尺寸上限**（Chrome 约 16384 px/边，总面积也有上限）。所以建 canvas **之前**就先判：单边 > 16384 或面积 > 32 MP 直接放弃转码（D26）。不要指望 `toBlob` 返回 `null` 来兜底——那时像素缓冲已经分配过了，OOM 已经发生。
 
 `⇧` + 点击走 `navigator.clipboard.writeText(url)`，不碰字节，永不失败。
+
+**超限降级的出口。** `copyImage(media, url)` 返回 `'image' | 'address'`：像素超预算时它内部做 `copyText(url)`，调用方据此 toast `Too large to copy — address copied`。降级必须被说出来——与 5.4「失败就是缺失」同一条原则：用户手里拿到的东西变了，他得知道。
 
 ---
 

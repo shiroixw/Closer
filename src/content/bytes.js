@@ -94,9 +94,20 @@ Closer.bytes = async function (url, want = 'meta') {
 
   if (want === 'meta') {
     if (url === lastUrl && lastMeta) return lastMeta;
+
+    const pending = ask(url, 'meta').then((r) => {
+      // 失败不钉住：把 URL 留在缓存里，等于这张图重开多少次都不会再试一次，
+      // 面板那一行就永远是空的。失败按「这次没有」处理，不是「以后都没有」。
+      if (!r && lastUrl === url) {
+        lastUrl = '';
+        lastMeta = null;
+      }
+      return r;
+    });
+
     lastUrl = url;
-    lastMeta = ask(url, 'meta');
-    return lastMeta;
+    lastMeta = pending;
+    return pending;
   }
 
   return ask(url, 'full');
