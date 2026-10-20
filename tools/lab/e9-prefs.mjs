@@ -262,7 +262,8 @@ await sleep(300);
 
 /* ---------- 3. 在 popup 里点按钮换背板，已打开的 overlay 必须立刻变 ---------- */
 
-const EXPECT = { light: 'rgb(244, 244, 245)', checker: 'rgb(255, 255, 255)', dark: 'rgb(11, 11, 12)' };
+// light 是半透明浅黑，不是白：纯白背板在暗环境里刺眼，也把页面整个埋掉
+const EXPECT = { light: 'rgba(24, 24, 27, 0.55)', checker: 'rgb(255, 255, 255)', dark: 'rgb(11, 11, 12)' };
 
 for (const want of ['light', 'checker']) {
   // 真的点那个按钮：走 popup.js 的 click → storage.set → content 的 onChanged

@@ -39,7 +39,9 @@ Closer.overlay = (function () {
 .backdrop.in{opacity:1}
 /* 主题类挂在 host 上，必须用 :host(.x)；写成 .x .y 会静默失效（背板透明） */
 :host(.dark) .backdrop{background:#0b0b0c}
-:host(.light) .backdrop{background:#f4f4f5}
+/* 「浅」是半透明的浅黑，不是白：纯白背板在暗环境里刺眼，也把页面整个埋掉。
+   留 45% 透光，页面从背后隐约透出，图仍是唯一的焦点。 */
+:host(.light) .backdrop{background:rgba(24,24,27,.55)}
 :host(.checker) .backdrop{background-color:#fff;background-image:
   linear-gradient(45deg,#d9d9dd 25%,transparent 25%,transparent 75%,#d9d9dd 75%),
   linear-gradient(45deg,#d9d9dd 25%,transparent 25%,transparent 75%,#d9d9dd 75%);
