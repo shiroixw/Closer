@@ -174,6 +174,14 @@ const page = connect(tab.webSocketDebuggerUrl);
 await page.ready;
 await page.send('Runtime.enable');
 await page.send('Page.enable');
+// 固定视口：本测试靠点击命中几何，窗口一旦被缩小，600×450 的图放不下、
+// pickOnce 会把它全部过滤掉，然后报「页面里没有可点的图」。
+await page.send('Emulation.setDeviceMetricsOverride', {
+  width: 1280,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
 
 const evaluate = async (expression) => {
   const r = await page.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });

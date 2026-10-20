@@ -186,6 +186,16 @@ const check = (name, ok, detail = '') => results.push({ name, ok: !!ok, detail }
 /* --- 1. CPU 4× 降速 --- */
 
 await send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+// 固定视口：不固定的话，窗口一被缩小，图片中心就落到视口外，
+// 点击落空 → 报「overlay 没打开」。而那不是产品坏了，是测试环境变了。
+// 顺带让首帧数字在机器之间可比。
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 1280,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
 await sleep(200);
 
 /* --- 2. judge() 单次耗时 --- */
@@ -250,6 +260,7 @@ check('监听绑在打开之后', overlayAdds > 0, `overlay.js 共 ${overlayAdds
 /* --- 5. 收尾 --- */
 
 await send('Emulation.setCPUThrottlingRate', { rate: 1 });
+await send('Emulation.clearDeviceMetricsOverride');
 ws.close();
 await j(`/json/close/${tab.id}`).catch(() => {});
 server.close();

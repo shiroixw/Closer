@@ -121,6 +121,14 @@ const page = connect(tab.webSocketDebuggerUrl);
 await page.ready;
 await page.send('Runtime.enable');
 await page.send('Page.enable');
+// 钉住视口：本测试断言的是几何（适应后是否溢出、居中），
+// 窗口尺寸在测试期间会变，不钉住就会出现「图片右边超出 9px」这种与环境有关的假红。
+await page.send('Emulation.setDeviceMetricsOverride', {
+  width: 1280,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+});
 
 const evaluate = async (expression, userGesture = false) => {
   const r = await page.send('Runtime.evaluate', {
@@ -259,6 +267,18 @@ async function pickSmallImage() {
 /* --- A. 注入与不打扰 --- */
 
 const domBefore = await evaluate('document.documentElement.outerHTML.length');
+// 不拿整页长度当判据：真实站点上第三方脚本随时会改 DOM
+// （实测评论区被挂了 style="!important"，凭空多 19 字符，却和我们无关）。
+// 判据指向我们自己的责任范围；「逐字节还原」由 e4 在可控桩页面验。
+const RESIDUE = `(() => {
+  const de = document.documentElement;
+  return JSON.stringify({
+    cls: de.getAttribute('class'),
+    style: de.getAttribute('style'),
+    htmlKids: de.children.length,
+  });
+})()`;
+const residueBefore = await evaluate(RESIDUE);
 
 check('A1 未点击时不注入任何节点', (await hasOverlay()) === false);
 
@@ -405,8 +425,11 @@ if (st) {
 
   check('F1 Esc 关闭 overlay', (await hasOverlay()) === false);
 
+  const residueAfter = await evaluate(RESIDUE);
   const domAfter = await evaluate('document.documentElement.outerHTML.length');
-  check('F2 关闭后 DOM 长度回到打开前', Math.abs(domAfter - domBefore) <= 2, `${domBefore} → ${domAfter}`);
+
+  check('F2 关闭后没有 Closer 的残留', residueAfter === residueBefore, residueAfter === residueBefore ? 'html 属性与子节点数未变' : `${residueBefore} → ${residueAfter}`);
+  check('F2b 关闭后整页长度没有明显增长', domAfter - domBefore < 200, `${domBefore} → ${domAfter}（站点自身可能微增）`);
 }
 
 /* ---------- 收尾 ---------- */
