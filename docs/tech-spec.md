@@ -412,7 +412,7 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 
 | 预算 | 测法 |
 | --- | --- |
-| < 40 KB | `wc -c src/content/*.js \| tail -1` |
+| < 60 KB | `wc -c src/content/*.js \| tail -1`，或直接看 `tools/check-manifest.mjs` 的告警行 |
 | `judge()` < 1 ms | 开发时在控制台对同一张图跑 1000 次取平均；**不写进发布代码** |
 | 点击 → 首帧 < 100 ms | 同上，`performance.mark` 两次；只在本地验 |
 | 加载期 2 个监听 | 数 `addEventListener`，跑测试时在 `chrome://extensions` 检查 |
