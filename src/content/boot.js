@@ -47,7 +47,9 @@ var Closer = (window.Closer ||= {});
     } catch {
       /* 拿不到选区就当没有，按第二条偏向打开 */
     }
-    down = { x: e.clientX, y: e.clientY, t: performance.now(), sel };
+    // 用事件自己的时刻，不用 performance.now()：后者量的是「handler 执行时刻」，
+    // 页面卡顿时会把几十毫秒的按下量成几百毫秒，把正常点击误当成「按住太久」。
+    down = { x: e.clientX, y: e.clientY, t: e.timeStamp, sel };
   }
 
   function onClick(e) {
@@ -63,7 +65,7 @@ var Closer = (window.Closer ||= {});
     // 拖了一下、按了很久、或者按下时正选着字：都不是「看这张图」
     if (d) {
       if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) return;
-      if (performance.now() - d.t > HOLD_MS) return;
+      if (e.timeStamp - d.t > HOLD_MS) return;
       if (d.sel) return;
     }
 

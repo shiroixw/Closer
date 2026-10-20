@@ -45,7 +45,10 @@ Closer.overlay = (function () {
   linear-gradient(45deg,#d9d9dd 25%,transparent 25%,transparent 75%,#d9d9dd 75%);
   background-size:18px 18px;background-position:0 0,9px 9px}
 .stage{position:absolute;inset:0}
-.photo{position:absolute;inset:0;margin:auto;display:block;max-width:none;max-height:none;
+/* 居中不用 inset:0 + margin:auto：布局尺寸是原图像素，当它大于视口时
+   margin:auto 不会产生负边距（CSS 规范），元素退化成 left:0/top:0，
+   于是大图在窄窗口里偏右下、右侧被裁。50% + -50% 与尺寸无关。 */
+.photo{position:absolute;left:50%;top:50%;margin:0;display:block;max-width:none;max-height:none;
   transform-origin:center center;cursor:grab;user-select:none;will-change:transform}
 .photo.dragging{cursor:grabbing}
 /* bar 本体不接点击：它是整条顶部横带，会吞掉「点背板关闭」。只有按钮是命中区 */
@@ -172,8 +175,10 @@ button:hover{background:rgba(63,63,70,.9)}
 
   function apply(transition) {
     photo.style.transition = transition || 'none';
+    // -50%,-50% 先把元素中心对到视口中心，再叠加平移/旋转/缩放。
+    // 这样居中不依赖元素自身尺寸，也就不会在窄窗口里失效。
     photo.style.transform =
-      `translate(${view.tx}px,${view.ty}px) rotate(${view.r}deg) scaleX(${view.f}) scale(${view.s})`;
+      `translate(-50%,-50%) translate(${view.tx}px,${view.ty}px) rotate(${view.r}deg) scaleX(${view.f}) scale(${view.s})`;
   }
 
   /** 以指针 P 为锚点缩放。式子在旋转与翻转下都精确（技术方案 3.2）。 */
@@ -654,9 +659,19 @@ button:hover{background:rgba(63,63,70,.9)}
     cur = null;
   }
 
+  /**
+   * 偏好变了（在 popup 里换背板）：已经打开的这一张立刻换，不必等下次点击。
+   * 幂等——B 键自己也会调 setBackdrop，随后 storage 回调再来一次不会有事。
+   */
+  function syncBackdrop() {
+    if (state !== 'open') return;
+    setBackdrop(Closer.state.prefs.backdrop || 'dark');
+  }
+
   return {
     open,
     close,
+    syncBackdrop,
     isOpen: () => state === 'open',
   };
 })();

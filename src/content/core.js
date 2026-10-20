@@ -123,6 +123,8 @@ try {
 
     if (changes[PREFS_KEY] && changes[PREFS_KEY].newValue) {
       Closer.state.prefs = { ...DEFAULT_PREFS, ...changes[PREFS_KEY].newValue };
+      // 和暂停一样：状态变了，眼前这一张必须立刻跟上，不能等下次点击
+      Closer.overlay?.syncBackdrop?.();
     }
   });
 } catch {
