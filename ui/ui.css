@@ -22,7 +22,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-body.wide { width: auto; max-width: 560px; margin: 0 auto; padding: 40px 24px 56px; }
+/* welcome 是整页，popup 是 288px 的小窗。两者共用一套基础样式，
+   差异全部收敛在这几条 .wide 规则里——别在 welcome.html 上挂 div.wide，
+   那和 body.wide 是两回事（曾经因此整页被压成 288px）。 */
+body.wide {
+  width: auto;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* safe：暂停列表长到超过一屏时退回顶部对齐，而不是把开头裁掉 */
+  justify-content: safe center;
+  padding: 48px 24px;
+}
+.wide h1 { font-size: 20px; letter-spacing: -0.02em; margin-bottom: 6px; }
+.wide > p { font-size: 13.5px; line-height: 1.62; }
+.wide .note { font-size: 12.5px; line-height: 1.7; }
+.wide .row { padding: 12px 0; }
 
 h1 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; color: var(--dim); }
@@ -67,6 +84,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .dot.off { background: #71717a; }
 
 ul { list-style: none; margin: 6px 0 0; padding: 0; }
+ul:empty { display: none; }
 li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; }
 li button { padding: 2px 8px; font-size: 11px; }
 
