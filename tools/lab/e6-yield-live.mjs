@@ -3,10 +3,14 @@
 // E1 验的是「判据对不对」，E5 验的是「扩展能不能活」，这一层验的是
 // 「真扩展 + 真 content script 下，我们会不会跟站点抢活」。
 //
-// 三个受控场景，一个本地页：
-//   plain  没有任何处理器     → 我们开
-//   sync   点击同步挂查看器   → 我们让位，一个节点都不加
-//   late   800ms 后才挂查看器 → 我们先开，1200ms 内自己关掉
+// 受控场景，一个本地页：
+//   plain  没有任何处理器       → 我们开
+//   sync   点击同步挂查看器     → 我们让位，一个节点都不加
+//   late   800ms 后才挂查看器   → 我们先开，1200ms 内自己关掉
+//   card   图片被声明成可点区域 → 判断器拦住（cursor:pointer）
+//   square 正方形小图           → 判断器拦住（正方形且短边 < 600）
+//   zoom   点击就地放大这张图   → 让位检测第 5 判据拦住（图自己的属性）
+//   box    放大写在容器上       → 第 5 判据拦住（容器的属性）
 //
 // 页面用 http://127.0.0.1 提供：扩展的 matches 是 *://*/*，file:// 不在其中。
 
@@ -88,6 +92,8 @@ const PAGE = `<!doctype html>
   .case.clickable img { cursor: pointer; }
   .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 99999;
     display: grid; place-items: center; }
+  /* 放大写在容器上：图自己的属性一个字都不变 */
+  #box.zoomed img { transform: scale(1.6); }
   .lightbox img { width: 80vw; height: 80vh; object-fit: contain; }
   h3 { font-size: 13px; color: #666; margin: 0 0 6px; }
 </style>
@@ -97,6 +103,8 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>late — 800ms 后才挂查看器</h3><img id="late" src="/photo.png" alt="late"></div>
 <div class="case clickable"><h3>card — 图片被声明成可点区域</h3><img id="card" src="/photo.png" alt="card"></div>
 <div class="case"><h3>square — 正方形小图（二维码 / 头像）</h3><img id="square" src="/square.png" alt="square"></div>
+<div class="case"><h3>zoom — 点击后页面就地放大这张图</h3><img id="zoom" src="/photo.png" alt="zoom"></div>
+<div class="case"><h3>box — 点击后页面把装着图的容器放大</h3><div id="box"><img src="/photo.png" alt="box"></div></div>
 
 <script>
 function viewer() {
@@ -111,6 +119,18 @@ function viewer() {
 
 document.getElementById('sync').addEventListener('click', () => { viewer(); });
 document.getElementById('late').addEventListener('click', () => { setTimeout(viewer, 800); });
+// Pexels 照片页的形态：不导航、不弹层，只把 transform 写回这张图自己。
+// 元素没换、位置没动，另外四个判据全哑；只有它自己的 style 变了。
+document.getElementById('zoom').addEventListener('click', () => {
+  const im = document.getElementById('zoom');
+  const on = im.style.transform === 'scale(3)';
+  im.style.transform = on ? '' : 'scale(3)';
+  im.style.cursor = on ? 'zoom-in' : 'zoom-out';
+});
+// 同一个放大镜的另一种写法：class 加在容器上，图自己的属性一个字都没变。
+document.getElementById('box').addEventListener('click', () => {
+  document.getElementById('box').classList.toggle('zoomed');
+});
 </script>`;
 
 const server = http
@@ -305,6 +325,28 @@ await reload();
 await clickImage('square');
 await sleep(600);
 check('Q1 正方形小图不被接管', (await has()) === false);
+
+/* --- zoom：点击后页面就地放大这张图（Pexels 照片页的形态） --- */
+
+await reload();
+await clickImage('zoom');
+await sleep(600);
+check('Z1 站点就地放大那张图：我们不接管', (await has()) === false);
+check(
+  'Z2 站点自己的放大保留',
+  (await ev("getComputedStyle(document.getElementById('zoom')).transform")) !== 'none'
+);
+
+/* --- box：放大写在装着图的容器上 --- */
+
+await reload();
+await clickImage('box');
+await sleep(600);
+check('W1 放大写在容器上：我们不接管', (await has()) === false);
+check(
+  'W2 容器的放大保留',
+  (await ev("document.getElementById('box').classList.contains('zoomed')")) === true
+);
 
 /* ---------- 收尾 ---------- */
 
