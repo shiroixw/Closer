@@ -12,7 +12,7 @@
 | --- | --- |
 | `npm run verify` | 一条命令跑完五件事：manifest 引用完整性、权限白名单与体积预算、每个发布文件的语法、判断器 19 条规则、尺寸与文件名 31 条断言 |
 | `npm run smoke` | 真浏览器三件：E4 overlay 打开与关闭后 DOM 逐字节还原、E6 让位检测、E7 速度预算 |
-| `npm run live` | 装真扩展跑真实网页：E5 全链路 24 项、E8 三种背板 13 项 |
+| `npm run live` | 装真扩展跑真实网页：E5 全链路 25 项、E8 三种背板 13 项、E9 偏好联动与窄视口居中 7 项 |
 | `node tools/lab/e2-drift.mjs` | 图片动的时候，命中点判据会不会脱靶（480 次比对，0 漂移） |
 | `node tools/lab/e3-pollution.mjs` | 跨域图经 blob 中转后 canvas 还污不污染（不污染，复制可做） |
 
@@ -34,7 +34,7 @@ Chrome 自带一个看图器。十几个扩展各有一个，其中已经有一�
 | [`docs/design-v0.1.md`](docs/design-v0.1.md) | 真正的 v0.1：权限模型、点击契约、让位检测、有序信号表、overlay 与信息面板规格、架构，以及十二条手工验收标准。 |
 | [`docs/tech-spec.md`](docs/tech-spec.md) | 实现级方案：模块契约、状态机、坐标数学、让位检测落地、字节通道、视图层（事件所有权、渲染、焦点）、复制与保存链路、MV3 的坑。最后三个实验必须在写代码前跑完。 |
 | [`docs/decisions.md`](docs/decisions.md) | 哪些已经锁定及原因、曾经的分歧是怎么收敛的，以及已被否决的方案——写下来，是为了让它们别再回来。 |
-| [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十四件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
+| [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十五件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
 
 ## 一段话总结
 

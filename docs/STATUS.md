@@ -9,18 +9,19 @@
 **M4 完成 · 待手工验收**（M0 契约、M1 判断器、M2 视图层、M3 面板与动作、M4 真机回归全部闭环）
 
 **2026-10-20 一轮优化**：视图层修三处（chrome 唤不回、顶栏吞点击、复制不可发现）、点击契约补上设计 §3.1 的三条放行规则、纯函数补测 31 条、E8 从「外网站点诊断」改成「自包含桩页面回归」。
+**同日第二轮**：popup 授权后仍显示 Allow（`[hidden]` 被 `.row` 盖掉）、popup 换背板时已打开的图不跟着变（新增 E9）、窄窗口下大图偏右下并被裁（`margin:auto` 在溢出时不生效）、E5/E7/E8/E9 全部固定视口（点击类测试此前会因窗口大小假红）、E5 的还原判据从整页长度改为指向自身痕迹。
 
-代码写完了，112 项自动断言全绿。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
+代码写完了，120 项自动断言全绿。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
 所以 **`安装 → welcome → 点 Enable → 授权 → 动态注册` 这条链路一次都没被真人走通过**。
-按 `docs/manual-check.md` 走一遍（14 条），才算真的可上架。
+按 `docs/manual-check.md` 走一遍（15 条），才算真的可上架。
 
 | 验收 | 结果 |
 |---|---|
 | `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、判断器 19/19、尺寸与文件名 31/31） |
 | `npm run smoke` | ✅ 25/25（e4 桩测 13 + e6 让位真机 7 + e7 速度预算 5） |
-| `npm run live` | ✅ 37/37（e5 真实站点 24 + e8 三主题 13） |
-| content 侧体积 | ✅ **40.2 KB / 60 KB**（余量 19.8 KB；本轮 +2.5 KB，全花在 §3.1 与唤回逻辑上） |
-| 速度（CPU 4×） | ✅ judge **0.005 ms** · 首帧 **18.5 ms** · 加载期 **2 个**监听（用满第六条的预算） |
+| `npm run live` | ✅ 45/45（e5 真实站点 25 + e8 三主题 13 + e9 偏好与居中 7） |
+| content 侧体积 | ✅ **41.3 KB / 60 KB**（余量 18.7 KB） |
+| 速度（CPU 4×） | ✅ judge **0.004 ms** · 首帧 **19.7 ms** · 加载期 **2 个**监听（用满第六条的预算） |
 
 ## 模块状态
 
@@ -34,7 +35,8 @@
 | 字节通道 | `src/content/bytes.js` + `src/background.js` | ✅ 真图已通 | e5：面板显示 `WEBP · 58 KB` |
 | 视图层 overlay | `src/content/overlay.js` | ✅ | e4：开、transform 生效、背板淡入、Esc 后 host 摘除、DOM 逐字节一致 |
 | 复制 / 保存 | `src/content/actions.js` | ✅ 代码 / ⚠️ 剪贴板未验 | 需真人点（合成事件没有瞬时激活） |
-| popup | `ui/popup.html` + `popup.js` | ✅ | 授权、按站点暂停、背景三选一 |
+| popup | `ui/popup.html` + `popup.js` | ✅ | 授权、按站点暂停、背景三选一；已授权时权限行不可见（e9） |
+| 偏好跨上下文同步 | `core.js` + `overlay.js` | ✅ | popup 点按钮 → storage → 已打开的背板立刻换（e9 6/6） |
 | welcome | `ui/welcome.html` + `welcome.js` | ✅ | 授权说明、暂停列表增删 |
 | 图标 16/32/48/128 | `icons/` + `tools/icons.py` | ✅ | 241 B – 1.7 KB，`python3 tools/icons.py` 可重生 |
 | 实验 E1–E8 | `tools/lab/` | ✅ E2–E8 存在，E1 析出为 `tools/probe-yield.js` | 均需 CDP，未接入 CI；E8 已改为自包含桩页面，不再依赖外网 |
@@ -54,6 +56,7 @@
 | T9 | ~~体积回收~~ | 改为**预算本身**：40 → 60 KB（宪法第六条修正，见 D21） | ✅ 关闭。压缩实现省了 289 B；余下 6.95 KB 是注释，删它违反第五条 |
 | T10 | 视图层三处：chrome 唤回、顶栏吞点击、复制 tooltip | 淡出后指针一动就回来；顶部空白处点击能关闭；`⇧` 复制地址可见 | ✅ 已修，e4 13/13 + e5 24/24 未回归；手感由 manual-check 11/12 验 |
 | T11 | 纯函数补测（ratio / humanBytes / formatOf / fileName / meta） | `npm run verify` 含 31 条断言 | ✅ 31/31 |
+| T12 | popup 换背板 → 已打开的 overlay 立刻生效 | 点按钮后不等下次点击就变；关掉重开仍生效 | ✅ e9 6/6（真扩展 + 真授权 + 真按钮点击） |
 
 ## 中断规则（这条最重要）
 
@@ -86,6 +89,11 @@
 
 | bug | 怎么发现的 | 断言 |
 |---|---|---|
+| **窄窗口下大图偏右下、右侧被裁**：`.photo` 用 `inset:0 + margin:auto` 居中，但它的布局尺寸是**原图像素**；一旦比视口大，CSS 规范下 `margin:auto` 不产生负边距，元素退化成 `left:0/top:0`，靠 transform 缩完就偏右下 | e5 在 500×288 的窗口里报「适应后完整在视口内」失败，量到 `217×271 @ 292,9`，右边 509 > 500 | 改成 `left/top:50%` + `translate(-50%,-50%)`，居中不再依赖元素尺寸；e9 新增窄视口断言 |
+| **e6 在 `npm run smoke` 里偶发 3 项失败**（S1/L1/L3），单独连跑两次均 7/7。未定位，怀疑是 e4 之后的端口/时序残留 | 一次全量 smoke 出现，随后复跑不复现 | 待观察，暂不阻塞 |
+| **popup 换背板，已打开的那张不跟着变**：`core.js` 的 `storage.onChanged` 只更新了 `state.prefs`，没让正在显示的 overlay 重新应用；要等下次点击才生效。暂停列表那条分支早就调了 `overlay.close()`，prefs 这条漏了 | 用户截图对比 | e9 六条：真扩展里点 popup 按钮，已打开的背板在 80 ms 内变色 |
+| **e7/e8/e9 会因窗口大小假红**：点击坐标取自元素几何，而这三个测试从不约束视口。窗口被缩到 583×311 后，1200×800 图的中心落在视口外，`elementFromPoint` 返回 null，报「overlay 没打开」——看起来像产品坏了 | 连跑 e7 三次稳定失败；加诊断打印 `vw/vh/at` 才看清 | 三个测试统一 `Emulation.setDeviceMetricsOverride` 1280×900，e7 连跑三次 5/5 |
+| **e5 用整页 outerHTML 长度当「DOM 已还原」的判据**：真实站点上第三方脚本随时改 DOM（实测评论区被挂 `style="!important"`，凭空 +19 字符），断言因此误红 | 打印首个差异位置，发现改动在 `#comments`，与图片查看无关 | 判据改为「`<html>` 属性与子节点数未变」，逐字节还原仍由 e4 在可控桩页面验 |
 | **已授权却仍显示「Needs site access / Allow」**：`popup.js` 里 `permRow.hidden = granted` 一直是对的，但 `ui.css` 的 `.row{display:flex}` 盖掉了 UA 的 `[hidden]{display:none}`（特异性只有 0,1,0）。JS 在设，页面不认 | 用户截图：状态是绿色「On for every site」却还挂着 Allow 按钮 | `ui.css` 加 `[hidden]{display:none!important}`，实测 hidden 态 computed display 为 `none` |
 | **chrome 淡出后唤不回**：`wake()` 只在拖拽分支里调用，而 `.bar.idle` 带 `pointer-events:none`，`pointerenter` 永远收不到。用户必须滚轮或拖拽才能把按钮找回来 | 读代码；设计 5.2 明写「指针一动就回来」 | `manual-check` 第 11 条（自动化测不了手感） |
 | **整条顶栏吞掉「点背板关闭」**：`.bar` 是 `left:0;right:0` 的 flex 容器，两端之外都是命中区，点中 `onBar` 就不关闭 | 读代码 | `manual-check` 第 12 条 |
