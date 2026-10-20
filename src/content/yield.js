@@ -51,10 +51,25 @@ Closer.acted = function (b) {
   return '';
 };
 
-// 迟到纠正只关心一件事：点击点是不是被盖住了。
+// 迟到纠正只关心一件事：点击点是不是被页面盖住了。
+//
+// 这里必须用 elementsFromPoint（复数）并从下往上剪掉自己：
+// overlay 打开后 host 是 fixed + 最高 z-index，elementFromPoint 永远返回它，
+// 用它做判据的话，站点在下面挂什么我们都看不见——迟到纠正会彻底失效。
 Closer.covered = function (b) {
-  const now = document.elementFromPoint(b.x, b.y);
-  return now !== b.hit && !Closer.isOurs(now);
+  let under = null;
+  try {
+    for (const node of document.elementsFromPoint(b.x, b.y)) {
+      if (!Closer.isOurs(node)) {
+        under = node;
+        break;
+      }
+    }
+  } catch {
+    return false;
+  }
+  if (!under) return false; // 除了我们自己什么都没有，页面没动
+  return under !== b.hit;
 };
 
 /**

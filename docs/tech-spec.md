@@ -168,7 +168,22 @@ function isOurs(node) {
 
 ### 4.4 迟到纠正
 
-打开后挂 `600ms` 与 `1200ms` 两个定时器，各自跑一次 `acted(base)`；成立就**静默**关闭（不做退场动画，避免用户以为是自己关的）。关闭时清掉未触发的定时器。
+打开后挂 `600ms` 与 `1200ms` 两个定时器，各自跑一次检查；成立就**静默**关闭（不做退场动画，避免用户以为是自己关的）。关闭时清掉未触发的定时器。
+
+这里有个**会让整个机制失效**的坑：检查不能复用 `acted()`，更不能直接用 `elementFromPoint`。
+
+overlay 自己是 `position: fixed; inset: 0; z-index: 2147483647`，打开之后 `elementFromPoint(x, y)` 永远返回我们自己的 host。拿它去比对基线，结果恒为「页面没动」——迟到纠正一次都不会触发，而且表面上一切正常（站点查看器叠在我们下面，用户看到的是双开）。
+
+正确写法是 `elementsFromPoint` 拿整条视线，从前往后剪掉自己，再看剩下的第一个是不是基线元素：
+
+```js
+for (const node of document.elementsFromPoint(b.x, b.y)) {
+  if (!Closer.isOurs(node)) { under = node; break; }
+}
+return !!under && under !== b.hit;
+```
+
+`acted()` 不受影响：它在 overlay 打开**之前**调用，那时 host 还不存在。两条路径用两种取法，是刻意的。
 
 ---
 

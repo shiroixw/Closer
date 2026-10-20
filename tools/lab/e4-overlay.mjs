@@ -239,7 +239,12 @@ if (!ready) {
   })()`);
 
   const o = opened.value || {};
-  check('点大图 → overlay 打开', o.open === true);
+  check('点大图 → overlay 打开', o.open === true, `isOpen=${o.open} width=${o.width} src=${o.src}`);
+
+  // 浏览器里若还装着 Closer（比如真机回归没卸载），它会往这个页面也注入一份，
+  // 同一次点击上会有两个实例抢活，上面的断言会给出完全误导的结果。
+  const hostCount = (await evalx("document.querySelectorAll('#closer').length")).value;
+  check('环境干净：页面上只有一个 overlay', hostCount === 1, `找到 ${hostCount} 个 #closer`);
   check('照片按原始像素设宽（600px）', o.width === '600px', o.width);
   check('transform 已生效（动画结束）', o.transform === true);
   check('背板已淡入', o.backdrop === true);

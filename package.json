@@ -11,6 +11,7 @@
     "verify": "node tools/check-manifest.mjs && node tools/test-judge.mjs",
     "check": "node tools/check-manifest.mjs",
     "test": "node tools/test-judge.mjs",
-    "smoke": "node tools/lab/e4-overlay.mjs"
+    "smoke": "node tools/lab/e4-overlay.mjs && node tools/lab/e6-yield-live.mjs",
+    "live": "node tools/lab/e5-live.mjs"
   }
 }
