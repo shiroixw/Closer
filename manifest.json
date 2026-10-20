@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Closer — Click any image to view it full size",
+  "default_locale": "en",
+  "name": "__MSG_appName__",
   "version": "0.1.0",
-  "description": "Click any image to open it full size, in place, with its real dimensions. No tracking, no build step.",
+  "description": "__MSG_appDesc__",
   "minimum_chrome_version": "110",
   "permissions": ["storage", "scripting", "activeTab"],
   "optional_host_permissions": ["*://*/*"],

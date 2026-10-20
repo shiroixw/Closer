@@ -519,3 +519,24 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 **结论：「复制图片本身」可以做，第 7 节不必重写。** 附带确认了一条流程约束：blob 必须在页面里造，SW 只回传 `ArrayBuffer`——见第 7 节第二条。
 
 三个实验至此全部通过，**可以开始写第一行产品代码**。
+
+---
+
+## 13. 文案与语言（D28）
+
+两种语言：`en`（`default_locale`）与 `zh_CN`。语言由浏览器 UI 语言决定，代码里没有任何检测逻辑，也没有切换开关。
+
+| 位置 | 怎么取 | 为什么 |
+| --- | --- | --- |
+| content（overlay） | `Closer.t(key, subs)` → `chrome.i18n.getMessage` | `chrome.i18n` 是 content script 能直接调的少数 API 之一，同步——不破坏「click → open 只隔一次 rAF」 |
+| popup / welcome | `ui/i18n.js` 的 `t()` + `data-i18n` / `data-i18n-html` | HTML 不支持 `__MSG__`，只能由 JS 填；两个页面共用一份五行包装，不为它引模块系统 |
+| manifest | `__MSG_appName__` / `__MSG_appDesc__` | 平台唯一支持 manifest 本地化的机制；`default_locale` 与 `_locales/` 必须同时存在，缺一边 Chrome 直接装不上 |
+
+四条实现约束：
+
+- **占位符必须声明**在 `placeholders` 里（`"content": "$1"`），不要在 message 里直接写 `$1`。语序不同的语言只能靠占位符对上：`Pause on $SITE$` / `在 $SITE$ 上暂停`。
+- **漏 key 不报错**，`getMessage` 返回空串，界面上一块空白。所以 `Closer.t` 退回 key 本身（看得见 `copyFailed` 这种字），并由 `tools/check-i18n.mjs` 在 `verify` 阶段拦下。
+- **`<strong>` / `<code>` 写在 messages.json 里**，取用时显式 `{ escapeLt: false }`，且只灌进 `data-i18n-html` 的那几段说明文字；其余文案一律 `textContent`。
+- **key 必须写成字面量**：`Closer.t('copyFailed')`，不要 `Closer.t(someVar)`。`check-i18n` 靠静态扫字面量来判断「有没有引用不存在的 key」和「有没有没人引用的 key」，绕过去就等于关掉了这条检查。
+
+`tools/check-i18n.mjs` 的断言：默认语言目录存在 → 各语言 key 集合与默认语言逐字相同 → 同一 key 的占位符跨语言相同 → 代码/manifest 引用的 key 都存在（反向也报未被引用的 key）。它不需要浏览器，所以能进 `verify`。

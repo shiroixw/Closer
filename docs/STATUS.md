@@ -13,6 +13,7 @@
 **同日第三轮（bad case）**：H5 活动页的整块可点卡片被接管 → 判断器新增 `cursor:pointer`（认声明边界，D24）与正方形小图（D25）两条，e6 加 card / square 用例；把「让位检测回答不了只改文字/class 的点击」这个盲区写进 design §4 与 §8。
 **同日第四轮（发布前清账）**：`npm run verify` 在 Windows 上必然 ENOENT（`tools/` 把 `URL.pathname` 当路径，拼出 `D:\D:\…`）——两处已改回 `path.resolve`；`check-manifest` 新增「content 侧顶层声明撞名」检查，补上逐文件 `node --check` 结构上永远看不见的那类错误；`bytes` 的 meta 缓存不再钉住失败；复制大图加像素闸，超限降级为复制地址（D26）；shadow host 去掉 `aria-modal`（D27）。
 **同日补机制**：新增 `docs/cases.md` 案例台账（含一条「静态无解、不修」的记录），宪法第二条加「检验二」——上一次误接管是什么形态、为什么不在台账里。缺的不是规则，是发现机制。
+**同日第五轮（i18n）**：中英两种语言落地。用浏览器内置的 `_locales` + `chrome.i18n`（零依赖、零检测逻辑、不进 content 预算），manifest 的 name/description 也跟着切；新增 `tools/check-i18n.mjs` 进 `verify`。这一步推翻 D8，按第十条把代价写进 D28，宪法「非目标」与 design §10 同步改写。
 
 代码写完了，131 项自动断言全绿。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
 所以 **`安装 → welcome → 点 Enable → 授权 → 动态注册` 这条链路一次都没被真人走通过**。
@@ -20,10 +21,10 @@
 
 | 验收 | 结果 |
 |---|---|
-| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、判断器 27/27、尺寸与文件名 31/31、顶层声明 27 个无撞名） |
+| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 27/27、尺寸与文件名 31/31、顶层声明 27 个无撞名） |
 | `npm run smoke` | ✅ 28/28（e4 桩测 13 + e6 让位与可点区域 10 + e7 速度预算 5） |
 | `npm run live` | ✅ 45/45（e5 真实站点 25 + e8 三主题 13 + e9 偏好与居中 7） |
-| content 侧体积 | ✅ **46.2 KB / 60 KB**（余量 13.8 KB） |
+| content 侧体积 | ✅ **47.7 KB / 60 KB**（余量 12.3 KB；i18n 占 +1.5 KB） |
 | 速度（CPU 4×） | ✅ judge **0.005 ms** · 首帧 **22.1 ms** · 加载期 **2 个**监听（用满第六条的预算） |
 
 ## 模块状态
@@ -41,6 +42,7 @@
 | popup | `ui/popup.html` + `popup.js` | ✅ | 授权、按站点暂停、背景三选一；已授权时权限行不可见（e9） |
 | 偏好跨上下文同步 | `core.js` + `overlay.js` | ✅ | popup 点按钮 → storage → 已打开的背板立刻换（e9 6/6） |
 | welcome | `ui/welcome.html` + `welcome.js` | ✅ | 授权说明、暂停列表增删 |
+| 文案与语言 | `_locales/{en,zh_CN}/messages.json` + `ui/i18n.js` + `Closer.t` | ✅ 页面已真机验 / ⚠️ overlay 未验 | `check-i18n` 2 种语言 × 39 个 key 双向比对；zh-CN 的 Chrome 里实测 manifest 名、popup、welcome（含 `3 个站点` / `1 个站点` / `恢复`、`<strong>` 未被转义）；overlay 的中文文案需要 host 授权才能注入，留给 manual-check 17 |
 | 图标 16/32/48/128 | `icons/` + `tools/icons.py` | ✅ | 241 B – 1.7 KB，`python3 tools/icons.py` 可重生 |
 | 实验 E1–E8 | `tools/lab/` | ✅ E2–E8 存在，E1 析出为 `tools/probe-yield.js` | 均需 CDP，未接入 CI；E8 已改为自包含桩页面，不再依赖外网 |
 
@@ -62,6 +64,7 @@
 | T12 | popup 换背板 → 已打开的 overlay 立刻生效 | 点按钮后不等下次点击就变；关掉重开仍生效 | ✅ e9 6/6（真扩展 + 真授权 + 真按钮点击） |
 | T13 | `verify` 在 Windows 上可跑 | `npm run verify` 三件事全绿，不出现 `D:\D:\…` | ✅ 2026-10-20 本机实测 |
 | T14 | 跨文件顶层声明撞名纳入 `verify` | 注入一次重名 → 退出码 1 并指名两个文件 | ✅ 临时注入 `PAUSED_KEY` 验证，还原后重新变绿 |
+| T15 | 中英国际化（D28） | 浏览器语言是中文时，manifest / popup / welcome / overlay 全中文且没有一处露出 key 名；`verify` 含语言包检查 | ✅ `check-i18n` 通过（临时去掉一个占位符 → 退出码 1 并指名 key）；zh-CN 真机已验 manifest / popup / welcome，overlay 见 manual-check 17 |
 
 ## 中断规则（这条最重要）
 

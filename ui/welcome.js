@@ -17,7 +17,12 @@ async function render() {
 
   list.textContent = '';
   empty.hidden = paused.length > 0;
-  count.textContent = paused.length ? `${paused.length} site${paused.length > 1 ? 's' : ''}` : '—';
+  // 复数只有在多于一个时才是另一个 key：英文要说 sites，中文两个 key 文字相同但结构一致
+  count.textContent = !paused.length
+    ? '—'
+    : paused.length === 1
+      ? t('pausedCountOne')
+      : t('pausedCountMany', [String(paused.length)]);
 
   for (const site of paused) {
     const li = document.createElement('li');
@@ -25,7 +30,7 @@ async function render() {
     name.textContent = site;
 
     const del = document.createElement('button');
-    del.textContent = 'Resume';
+    del.textContent = t('resume');
     del.addEventListener('click', async () => {
       const now = await chrome.storage.local.get(PAUSED_KEY);
       const rest = (now[PAUSED_KEY] || []).filter((s) => s !== site);
@@ -44,7 +49,7 @@ async function render() {
     /* 忽略 */
   }
 
-  perm.textContent = granted ? 'Revoke access' : 'Allow on all sites';
+  perm.textContent = granted ? t('revokeAll') : t('allowAll');
   perm.classList.toggle('primary', !granted);
 }
 

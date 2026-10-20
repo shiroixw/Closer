@@ -32,12 +32,12 @@ async function activeHost() {
 
 function paint() {
   statusDot.className = granted ? 'dot on' : 'dot off';
-  statusText.textContent = granted ? 'On for every site' : 'Not enabled yet';
+  statusText.textContent = granted ? t('statusOn') : t('statusOff');
   permRow.hidden = granted;
 
   const isPaused = paused.some((e) => covers(e, host));
-  hostEl.textContent = host || 'This page';
-  pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+  hostEl.textContent = host || t('thisPage');
+  pauseBtn.textContent = isPaused ? t('resume') : t('pause');
   pauseBtn.disabled = !host;
 }
 

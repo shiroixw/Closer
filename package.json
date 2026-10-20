@@ -8,8 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "verify": "node tools/check-manifest.mjs && node tools/test-judge.mjs && node tools/test-meta.mjs",
-    "check": "node tools/check-manifest.mjs",
+    "verify": "node tools/check-manifest.mjs && node tools/check-i18n.mjs && node tools/test-judge.mjs && node tools/test-meta.mjs",
+    "check": "node tools/check-manifest.mjs && node tools/check-i18n.mjs",
     "test": "node tools/test-judge.mjs && node tools/test-meta.mjs",
     "smoke": "node tools/lab/e4-overlay.mjs && node tools/lab/e6-yield-live.mjs && node tools/lab/e7-perf.mjs",
     "live": "node tools/lab/e5-live.mjs && node tools/lab/e8-theme.mjs && node tools/lab/e9-prefs.mjs"
