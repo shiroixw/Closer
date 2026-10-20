@@ -8,7 +8,7 @@
 //   node tools/lab/e4-overlay.mjs
 
 import http from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const PORT = 8824;
@@ -233,6 +233,7 @@ if (!ready) {
       src: (p.src || '').endsWith('/img.png'),
       transform: cs.transform !== 'none',
       backdrop: h.shadowRoot.querySelector('.backdrop').classList.contains('in'),
+      bg: getComputedStyle(h.shadowRoot.querySelector('.backdrop')).backgroundColor,
       dims: h.shadowRoot.querySelector('.dims').textContent,
     };
   })()`);
@@ -242,9 +243,32 @@ if (!ready) {
   check('照片按原始像素设宽（600px）', o.width === '600px', o.width);
   check('transform 已生效（动画结束）', o.transform === true);
   check('背板已淡入', o.backdrop === true);
+  // 只查 opacity 会漏掉「类名挂错节点、背板其实是透明的」——页面会直接透出来
+  check('背板不透明（页面不透出）', /^rgb/.test(o.bg || '') && o.bg !== 'rgba(0, 0, 0, 0)', o.bg);
   check('信息面板显示 600 × 400', o.dims === '600 × 400', o.dims);
 
-  // 2. 缩放：滚轮放大
+  // 截图（可选）：视觉错位只有看图才知道，断言看不出来
+  if (process.env.SHOT) {
+    await send('Page.enable');
+    const shot = await send('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(process.env.SHOT, Buffer.from(shot.result.data, 'base64'));
+  }
+
+  // 2. 面板开合
+  const panelState = await evalx(`(() => {
+    const sr = document.getElementById('closer').shadowRoot;
+    const btn = sr.querySelector('.info');
+    btn.click();
+    const opened = !sr.querySelector('.panel').hidden && btn.getAttribute('aria-expanded') === 'true';
+    btn.click();
+    return { opened, closedAgain: sr.querySelector('.panel').hidden };
+  })()`);
+  check(
+    'ⓘ 能开合并收回（aria-expanded 跟随）',
+    panelState.value?.opened === true && panelState.value?.closedAgain === true
+  );
+
+  // 3. 缩放：滚轮放大
   const zoomed = await evalx(`(() => {
     const h = document.getElementById('closer');
     const p = h.shadowRoot.querySelector('.photo');

@@ -37,9 +37,11 @@ Closer.overlay = (function () {
 [hidden]{display:none!important}
 .backdrop{position:absolute;inset:0;opacity:0;transition:opacity ${ms(260)}ms ease;cursor:zoom-out}
 .backdrop.in{opacity:1}
-.backdrop.dark{background:#0b0b0c}
-.backdrop.light{background:#f4f4f5}
-.backdrop.checker{background-color:#fff;background-image:
+/* 注意：主题类挂在 host 上，shadow 内部的后代选择器够不到它，
+   必须用 :host(.x) —— 写 .x .y 会静默失效，背板变成透明的。 */
+:host(.dark) .backdrop{background:#0b0b0c}
+:host(.light) .backdrop{background:#f4f4f5}
+:host(.checker) .backdrop{background-color:#fff;background-image:
   linear-gradient(45deg,#d9d9dd 25%,transparent 25%,transparent 75%,#d9d9dd 75%),
   linear-gradient(45deg,#d9d9dd 25%,transparent 25%,transparent 75%,#d9d9dd 75%);
   background-size:18px 18px;background-position:0 0,9px 9px}
@@ -54,10 +56,10 @@ Closer.overlay = (function () {
 button{all:unset;box-sizing:border-box;display:grid;place-items:center;cursor:pointer;color:inherit;
   border-radius:9px;background:rgba(24,24,27,.62);backdrop-filter:blur(8px);
   transition:background ${ms(140)}ms ease,color ${ms(140)}ms ease}
-.dark .bar button,.checker .bar button{background:rgba(24,24,27,.62)}
-.light .bar button{background:rgba(255,255,255,.72);color:#18181b}
+:host(.dark) .bar button,:host(.checker) .bar button{background:rgba(24,24,27,.62)}
+:host(.light) .bar button{background:rgba(255,255,255,.72);color:#18181b}
 button:hover{background:rgba(63,63,70,.9)}
-.light .bar button:hover{background:#fff}
+:host(.light) .bar button:hover{background:#fff}
 .info{width:32px;height:32px;font:600 15px/1 ui-sans-serif,system-ui,sans-serif;
   font-family:ui-sans-serif,system-ui,sans-serif}
 .act{width:32px;height:32px}
