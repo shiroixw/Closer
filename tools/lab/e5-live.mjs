@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { clean } from './clean-extensions.mjs';
 
 const CDP = process.env.CDP || 'http://127.0.0.1:9333';
 const TARGET = process.env.TARGET || 'https://www.ruanyifeng.com/blog/2026/10/weekly-issue-415.html';
@@ -75,6 +76,8 @@ function connect(url) {
 }
 
 /* ---------- 加载扩展 ---------- */
+
+await clean(CDP);
 
 /** 卸载临时扩展。不卸就会一直堆在 profile 里，污染后续的桩测试。 */
 async function uninstall(extensionId) {

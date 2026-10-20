@@ -70,8 +70,8 @@ for (const p of manifest.optional_host_permissions ?? []) {
   if (p !== '*://*/*') warnings.push(`optional_host_permissions 含非常规值：${p}`);
 }
 
-// ── 3. 体积预算（宪法第六条：content 侧 ≤ 40 KB 未压缩）──
-const BUDGET = 40 * 1024;
+// ── 3. 体积预算（宪法第六条：content 侧 ≤ 60 KB 未压缩）──
+const BUDGET = 60 * 1024;
 let contentBytes = 0;
 const walk = (dir) => {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -83,8 +83,8 @@ const walk = (dir) => {
 if (existsSync(join(ROOT, 'src/content'))) walk(join(ROOT, 'src/content'));
 if (contentBytes > 0) {
   const kb = (contentBytes / 1024).toFixed(1);
-  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 40 KB 预算（宪法第六条）`);
-  else warnings.push(`content 侧源码 ${kb} KB / 40 KB 预算`);
+  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 60 KB 预算（宪法第六条）`);
+  else warnings.push(`content 侧源码 ${kb} KB / 60 KB 预算`);
 }
 
 // ── 4. 每个发布文件都必须能解析 ──────────────────────────

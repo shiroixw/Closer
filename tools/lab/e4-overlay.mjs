@@ -10,6 +10,7 @@
 import http from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
+import { clean } from './clean-extensions.mjs';
 
 const PORT = 8824;
 const CDP = process.env.CDP || 'http://127.0.0.1:9333';
@@ -157,6 +158,9 @@ async function j(path, init) {
     return { raw: text };
   }
 }
+
+// 桩页面在 *://*/* 匹配内，任何残留实例都会和桩脚本互相让位。
+await clean(CDP);
 
 const target = await j(`/json/new?${encodeURIComponent(`http://127.0.0.1:${PORT}/`)}`, { method: 'PUT' });
 if (!target.webSocketDebuggerUrl) {

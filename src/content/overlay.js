@@ -37,8 +37,7 @@ Closer.overlay = (function () {
 [hidden]{display:none!important}
 .backdrop{position:absolute;inset:0;opacity:0;transition:opacity ${ms(260)}ms ease;cursor:zoom-out}
 .backdrop.in{opacity:1}
-/* 注意：主题类挂在 host 上，shadow 内部的后代选择器够不到它，
-   必须用 :host(.x) —— 写 .x .y 会静默失效，背板变成透明的。 */
+/* 主题类挂在 host 上，必须用 :host(.x)；写成 .x .y 会静默失效（背板透明） */
 :host(.dark) .backdrop{background:#0b0b0c}
 :host(.light) .backdrop{background:#f4f4f5}
 :host(.checker) .backdrop{background-color:#fff;background-image:
@@ -47,7 +46,7 @@ Closer.overlay = (function () {
   background-size:18px 18px;background-position:0 0,9px 9px}
 .stage{position:absolute;inset:0}
 .photo{position:absolute;inset:0;margin:auto;display:block;max-width:none;max-height:none;
-  transform-origin:center center;cursor:grab;user-select:none;-webkit-user-drag:none;will-change:transform}
+  transform-origin:center center;cursor:grab;user-select:none;will-change:transform}
 .photo.dragging{cursor:grabbing}
 .bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
   padding:12px 14px;transition:opacity ${ms(180)}ms ease;opacity:1}
@@ -56,29 +55,25 @@ Closer.overlay = (function () {
 button{all:unset;box-sizing:border-box;display:grid;place-items:center;cursor:pointer;color:inherit;
   border-radius:9px;background:rgba(24,24,27,.62);backdrop-filter:blur(8px);
   transition:background ${ms(140)}ms ease,color ${ms(140)}ms ease}
-:host(.dark) .bar button,:host(.checker) .bar button{background:rgba(24,24,27,.62)}
 :host(.light) .bar button{background:rgba(255,255,255,.72);color:#18181b}
 button:hover{background:rgba(63,63,70,.9)}
 :host(.light) .bar button:hover{background:#fff}
-.info{width:32px;height:32px;font:600 15px/1 ui-sans-serif,system-ui,sans-serif;
-  font-family:ui-sans-serif,system-ui,sans-serif}
+.info{width:32px;height:32px;font:600 15px/1 ui-sans-serif,system-ui,sans-serif}
 .act{width:32px;height:32px}
-.act svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;
-  stroke-linecap:round;stroke-linejoin:round}
+.act svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .act.done{color:#4ade80}
 .panel{position:absolute;top:56px;left:14px;width:232px;padding:12px 14px;border-radius:12px;
   background:rgba(24,24,27,.86);backdrop-filter:blur(12px);box-shadow:0 12px 32px rgba(0,0,0,.45);
   animation:pop ${ms(160)}ms ${EASE}}
 @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .panel .dims{font-size:15px;font-weight:500;letter-spacing:.01em}
-.panel .sub{color:#a1a1aa;font-size:12px;margin-top:2px}
-.panel .shown{color:#a1a1aa;font-size:12px;margin-top:2px}
+.panel .sub,.panel .shown{color:#a1a1aa;font-size:12px;margin-top:2px}
 .panel hr{border:0;border-top:1px solid rgba(255,255,255,.1);margin:10px 0 8px}
 .panel .pause{display:block;width:100%;text-align:left;font-size:12px;color:#a1a1aa;
   padding:2px 0;background:none;backdrop-filter:none}
 .panel .pause:hover{color:#f5f5f5;background:none}
 .toast{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);padding:7px 13px;
-  border-radius:9px;background:rgba(24,24,27,.9);color:#f5f5f5;font-size:12px;
+  border-radius:9px;background:rgba(24,24,27,.9);font-size:12px;
   opacity:0;transition:opacity ${ms(140)}ms ease}
 .toast.on{opacity:1}
 `;

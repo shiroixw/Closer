@@ -15,6 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import zlib from 'node:zlib';
+import { clean } from './clean-extensions.mjs';
 
 const CDP = process.env.CDP || 'http://127.0.0.1:9333';
 const PORT = 8831;
@@ -170,6 +171,8 @@ function connect(url) {
   };
 }
 
+await clean(CDP);
+
 /** 卸载临时扩展。不卸就会一直堆在 profile 里，污染后续的桩测试。 */
 async function uninstall(extensionId) {
   if (!extensionId) return;
@@ -286,7 +289,7 @@ const tabs = await json('/json/list');
 for (const t of tabs || []) {
   if (t.url && t.url.includes(extId)) await json(`/json/close/${t.id}`).catch(() => {});
 }
-await uninstall(extId);
+await clean(CDP, { quiet: true });
 fs.rmSync(stage, { recursive: true, force: true });
 server.close();
 
