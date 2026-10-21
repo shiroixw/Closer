@@ -74,6 +74,10 @@ var Closer = (window.Closer ||= {});
     const img = Closer.pick(target, e.clientX, e.clientY);
     if (!img || !Closer.judge(img)) return;
 
+    // 页面已经在自己开的那一层里展示它了：再开一层只是两套遮罩（case 006）。
+    // 这条路径一个字节都不改——不拦默认行为，站点自己的放大缩小照常。
+    if (Closer.shelled(img)) return;
+
     const base = Closer.snapshot(e.clientX, e.clientY);
     e.preventDefault(); // 只掐默认行为，不阻断传播：页面自己的处理器照常跑
 
