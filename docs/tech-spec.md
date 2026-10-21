@@ -16,6 +16,7 @@ core.js      Closer.host / Closer.state{ready, paused, prefs}
              await Closer.load() / pauseHere() / setBackdrop(name)
 
 detect.js    Closer.judge(img) -> boolean            纯函数，无副作用
+             Closer.pick(target, x, y) -> img | null  点击对应的是哪张图
 
 yield.js     Closer.snapshot(x, y) -> Baseline
              Closer.acted(baseline) -> boolean
@@ -35,6 +36,8 @@ boot.js      接线。唯一允许调用上面所有东西的地方。
 ```
 
 调用方向：`boot → detect → (yield) → bytes → overlay → actions`。`overlay` 不认识 `boot`，`detect` 不认识任何人。
+
+`pick()` 是 `judge()` 的前一步。图上方常盖着一层透明装饰（图库的致谢遮罩、卡片的悬停层），点击落在装饰上，`target.closest('img')` 什么也找不到——只看事件目标，这整类站点表现为「点了没反应」。所以 target 不是图时用 `elementsFromPoint` 把图找回来，三条边界：装饰本身是链接/控件就放行（那是页面的意图）；图必须与点击共享一个**非 body** 的祖先，否则点浮层、点页头会把下面任意一张图拽出来（`cases.md` 004）；命中栈顶是带 `shadowRoot` 的宿主时下钻（`ShadowRoot.elementsFromPoint`），最多 3 层——`elementFromPoint` 不穿 shadow，站点把图与遮罩做进 Web Component 时只有下钻才看得见（`cases.md` 005）。`sameFrame()` 是下钻的唯一信任来源，隔着组件猜出来的图会被它挡掉。
 
 `bytes.js` 是 `design-v0.1.md` 第 6 节文件表里后来补上的一项：取字节被 `meta`（要大小）、`actions`（要内容）和 `overlay`（显示）三方需要，抽出来才能只请求一次。
 
