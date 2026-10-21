@@ -70,7 +70,8 @@ var Closer = (window.Closer ||= {});
     }
 
     const target = e.composedPath()[0];
-    const img = target instanceof Element ? target.closest('img') : null;
+    // 图片上面盖了一层透明装饰时，target 与图无关，得按命中点找回来
+    const img = Closer.pick(target, e.clientX, e.clientY);
     if (!img || !Closer.judge(img)) return;
 
     const base = Closer.snapshot(e.clientX, e.clientY);

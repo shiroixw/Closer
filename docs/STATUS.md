@@ -21,9 +21,9 @@
 | 验收 | 结果 |
 |---|---|
 | `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、判断器 27/27、尺寸与文件名 31/31、顶层声明 27 个无撞名） |
-| `npm run smoke` | ✅ 28/28（e4 桩测 13 + e6 让位与可点区域 10 + e7 速度预算 5） |
+| `npm run smoke` | ✅ 30/30（e4 桩测 15 + e6 让位与可点区域 10 + e7 速度预算 5） |
 | `npm run live` | ✅ 45/45（e5 真实站点 25 + e8 三主题 13 + e9 偏好与居中 7） |
-| content 侧体积 | ✅ **46.2 KB / 60 KB**（余量 13.8 KB） |
+| content 侧体积 | ✅ **48.6 KB / 60 KB**（余量 11.4 KB） |
 | 速度（CPU 4×） | ✅ judge **0.005 ms** · 首帧 **22.1 ms** · 加载期 **2 个**监听（用满第六条的预算） |
 
 ## 模块状态
@@ -31,7 +31,8 @@
 | 模块 | 文件 | 状态 | 证据 |
 |---|---|---|---|
 | 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` 27/27（含 cursor:pointer 3 条、正方形 5 条） |
-| 点击契约（§3.1 三条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区，三条都在 `judge()` 之前判掉；e4 与 e5 全绿 |
+| 点击目标解析 `pick()` | `src/content/detect.js` | ✅ | target 不是图时按命中点栈找回，并逐层下钻 shadow root（`cases.md` 004 / 005）；e4 两条形态断言 + 真实图库页实测 |
+| 点击契约（§3.1 四条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区 / 点中链接或控件，都在 `judge()` 之前判掉；e4 与 e5 全绿 |
 | 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6：plain 开、sync 让、late 自关，7/7 |
 | 命名空间 / 偏好 / 暂停列表 | `src/content/core.js` | ✅ | — |
 | 尺寸比例格式 | `src/content/meta.js` | ✅ | `test-meta` 31/31（含 fileName） |
@@ -62,6 +63,7 @@
 | T12 | popup 换背板 → 已打开的 overlay 立刻生效 | 点按钮后不等下次点击就变；关掉重开仍生效 | ✅ e9 6/6（真扩展 + 真授权 + 真按钮点击） |
 | T13 | `verify` 在 Windows 上可跑 | `npm run verify` 三件事全绿，不出现 `D:\D:\…` | ✅ 2026-10-20 本机实测 |
 | T14 | 跨文件顶层声明撞名纳入 `verify` | 注入一次重名 → 退出码 1 并指名两个文件 | ✅ 临时注入 `PAUSED_KEY` 验证，还原后重新变绿 |
+| T15 | 点击目标解析：图被透明装饰盖住时不生效 | 点遮罩能打开下面的图；点链接/控件仍放行；shadow tree 内同样成立 | ✅ e4 15/15（light DOM + Web Component 两条）+ 真实图库页实测打开 |
 
 ## 中断规则（这条最重要）
 
@@ -95,6 +97,8 @@
 
 | bug | 怎么发现的 | 断言 |
 |---|---|---|
+| **同一形态的 Web Component 版仍然失效**：站点把「图 + 遮罩」放进 `open` shadow root。事件层是穿透的（`composedPath()[0]` 就是 shadow 里的遮罩），但 `document.elementsFromPoint` **只返回 host**，`pick()` 在 light DOM 里找不到图 → 又变成「点了没反应」。四形态实测顺带证明缺口不在「shadow 里的图」：直接点 shadow 内的 `<img>` 时 `composedPath()[0]` 就是 img，一直能打开 | 一次性实验页跑四形态：light 遮罩 ✓ / open shadow 遮罩 ✗ / open shadow 直接点图 ✓ / closed shadow ✗；修后同一脚本复跑：前三条全 ✓，closed 仍 ✗（边界） | `pick()` 增加逐层下钻 `shadowRoot`（≤ 3 层）；e4「shadow tree 里的遮罩：下钻后也能打开」（`cases.md` 005） |
+| **图库详情页点了没反应**（用户报）：图上方盖一层 `position:absolute; inset:0` 的透明致谢装饰，`cursor:auto`、无 `<a>`、无 `role`。`click` 的 target 是装饰层，`target.closest('img')` 为空，处理器在 `judge()` 之前就 return；页面自己也不响应，于是既没打开也没让位。<br>**判断器没有沉默**（925×573 / 830×514，十三条全过），沉默的是「点是哪张图」这一步——这是 `judge()` 管不到的地方 | 用户给 URL + 截图；用 `elementsFromPoint` 打出命中栈，第一层就是 `.photo__centered-frame__overlay`，它是图的兄弟节点 | 新增 `Closer.pick()`（检测 target 不是图时按命中点栈找回，要求共享非 `body` 祖先、装饰是链接/控件则放行）；e4「透明遮罩盖着的图，点遮罩也能打开」；真实页面实测 `pick` 命中、`judge` 为 true、overlay 打开 |
 | **窄窗口下大图偏右下、右侧被裁**：`.photo` 用 `inset:0 + margin:auto` 居中，但它的布局尺寸是**原图像素**；一旦比视口大，CSS 规范下 `margin:auto` 不产生负边距，元素退化成 `left:0/top:0`，靠 transform 缩完就偏右下 | e5 在 500×288 的窗口里报「适应后完整在视口内」失败，量到 `217×271 @ 292,9`，右边 509 > 500 | 改成 `left/top:50%` + `translate(-50%,-50%)`，居中不再依赖元素尺寸；e9 新增窄视口断言 |
 | **e6 在 `npm run smoke` 里偶发 3 项失败**（S1/L1/L3），单独连跑两次均 7/7。未定位，怀疑是 e4 之后的端口/时序残留 | 一次全量 smoke 出现，随后复跑不复现 | 待观察，暂不阻塞 |
 | **H5 活动页的卡片被接管**（用户报的 bad case）：整卡是 `<section>` + JS 事件委托，不是 `<a>`/`<button>`、无 role、无 onclick 属性，判断器前十条全漏；而它点击后只改自己某个元素的文字/class，`href`、`fullscreen`、命中点、滚动锁四个判据**全部沉默**——D9 的「行为即检测」在这个形态上有结构性盲区 | 用户提供页面与截图；实测点击后 `url` 未变、无弹层、无 fixed 覆盖、`body` 只长 28 字符 | 新增判断器第 11 条（`cursor:pointer` 认声明边界，D24）；e6 新增 card 用例，test-judge 加 3 条；真实页面上卡片被拦、页头大图仍能打开 |
