@@ -32,6 +32,7 @@ Closer.state = {
   paused: false, // 当前站点是否被暂停
   prefs: { ...DEFAULT_PREFS },
   host: null, // overlay 的 shadow host，由 overlay.js 建立
+  shell: null, // 页面自己开的那一层，由 yield.js 记录与失效
 };
 
 /* ---------- 加载 ---------- */
