@@ -19,7 +19,10 @@ detect.js    Closer.judge(img) -> boolean            纯函数，无副作用
              Closer.pick(target, x, y) -> img | null  点击对应的是哪张图
 
 yield.js     Closer.snapshot(x, y) -> Baseline
-             Closer.acted(baseline) -> boolean
+             Closer.acted(baseline) -> 命中的判据名 | ''
+             Closer.shelled(img) -> boolean          页面是否已经在自己那层里展示它
+             Closer.remember(node) -> void           记下页面刚动出来的那一层
+             Closer.covered(baseline) -> Element | null
              Closer.isOurs(node) -> boolean
 
 meta.js      Closer.meta(img) -> { url, nw, nh, sw, sh, ratio, mp, format }
@@ -53,6 +56,7 @@ idle ──click(候选)──> pending ──acted()──> idle
 
 - `pending` 期间再来一次点击：丢弃前一个 pending，重新开始。不排队。
 - `pending` 不得跨越导航：rAF 里先验 `location.href`，变了就不开。
+- 候选进 `pending` 之前先过 `shelled()`：页面已经在自己那层里展示这张图时直接放行，连 `preventDefault()` 都不做（4.5）。
 - 所有状态转换只发生在 `overlay` 内部，外部只能 `open` / `close`。
 
 时序上唯一必须守住的一条：**从 `click` 到 `open` 只允许隔一次 rAF。** 中间任何东西都不能是 `await`——`chrome.storage` 早在 `boot` 阶段读完了，`judge` 是纯同步的，`bytes` 是打开之后才发。
@@ -183,10 +187,49 @@ overlay 自己是 `position: fixed; inset: 0; z-index: 2147483647`，打开之�
 for (const node of document.elementsFromPoint(b.x, b.y)) {
   if (!Closer.isOurs(node)) { under = node; break; }
 }
-return !!under && under !== b.hit;
+return !!under && under !== b.hit;   // 现在返回 under 本身，供 4.5 记住那一层
 ```
 
 `acted()` 不受影响：它在 overlay 打开**之前**调用，那时 host 还不存在。两条路径用两种取法，是刻意的。
+
+### 4.5 存量判据：记住页面接管的那一层
+
+`acted()` 的四个判据全是**增量**，它们默认「页面还没动手」。站点自带查看器时这个前提不成立：第一次点击页面接管之后，后续每一次点击都发生在已经接管的状态里，四项前后完全一样，全部沉默（`cases.md` 006）。站点自己的缩放更看不见——命中点比的是元素身份，`transform` 不改身份。
+
+所以再加一个**存量**判据，问的是一句话：页面是不是已经在自己开的那一层里展示这张图。
+
+```js
+// 页面出手的那一刻：从它留在命中点上的节点往上，找第一个盖住 90% 视口的祖先。
+Closer.remember = function (node) {
+  if (!node || Closer.isOurs(node)) return;
+  for (let n = node, i = 0; n && i < 8; i++) {
+    if (n === document.body || n === document.documentElement) return;   // body 是万能祖先
+    if (coversViewport(n)) { Closer.state.shell = n; return; }
+    const root = n.getRootNode();
+    n = n.parentElement || (root instanceof ShadowRoot ? root.host : null);  // 祖先链不穿 shadow
+  }
+};
+
+// 之后的每一次点击：只问那层还在不在、里面是不是这张图。
+Closer.shelled = function (img) {
+  if (document.fullscreenElement) return true;      // 全屏时我们开了也看不见
+  const shell = Closer.state.shell;
+  if (!shell) return false;                         // 常见路径：一次空值判断
+  if (!shell.isConnected || !coversViewport(shell)) { Closer.state.shell = null; return false; }
+  return shell.contains(img);
+};
+```
+
+四个刻意的决定：
+
+1. **挂接点复用既有的两处观测，不新增观察者。** `acted()` 命中时 `remember(now)`；`watchLate` 里 `covered()` 返回被谁盖住，同样 `remember(under)`——慢半拍的接管也是接管，不然它后面那一次点击照样会叠。
+2. **不判断「它像不像查看器」。** 归因来自「它是在这次点击之后出现的」，这是证据不是猜测。所以没有图片尺寸、视口占比之类的阈值——站点把图缩到 25%、放大后拖到一边，结论不变。
+3. **`body` / `html` 永远不算那一层。** 否则 app 外壳（整站躺在 `fixed` 全屏容器里）会被认成查看器，整站失效（D24 的同一条教训）。
+4. **判死即忘。** `isConnected` 为假、或不再盖住视口（被 `display:none` 掉）就清空。状态自愈，没有过期时间，也不落 storage——不产生用户看不见的站点名单。
+
+**不记在站点上。** 「点一次发现页面消费了 → 这个域名以后都不接管」看似更省事，但 `acted()` 命中的原因远不止查看器（点卡片展开、tab 切换、SPA 软导航、慢挂广告）。一次观测去赌整站行为，换来的是不可解释、不可逆的整站失效（D28）。
+
+**记得住的前提是我们看见了那一刻。** 页面加载即开着查看器、用键盘打开、点击后原地放大同一张图（元素身份不变、也没有新层）——这三类记不到，会叠一次，写进 `design §8`。若以后高频，补法是给 `shelled()` 加一个 OR 分支，主结构不动。
 
 ---
 
