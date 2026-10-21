@@ -73,7 +73,7 @@ var Closer = (window.Closer ||= {});
     const img = target instanceof Element ? target.closest('img') : null;
     if (!img || !Closer.judge(img)) return;
 
-    const base = Closer.snapshot(e.clientX, e.clientY);
+    const base = Closer.snapshot(e.clientX, e.clientY, img);
     e.preventDefault(); // 只掐默认行为，不阻断传播：页面自己的处理器照常跑
 
     settle(() => {

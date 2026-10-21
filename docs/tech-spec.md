@@ -17,7 +17,7 @@ core.js      Closer.host / Closer.state{ready, paused, prefs}
 
 detect.js    Closer.judge(img) -> boolean            纯函数，无副作用
 
-yield.js     Closer.snapshot(x, y) -> Baseline
+yield.js     Closer.snapshot(x, y, img) -> Baseline
              Closer.acted(baseline) -> boolean
              Closer.isOurs(node) -> boolean
 
@@ -124,17 +124,18 @@ const next = s * Math.exp(-dy * 0.0018);         // 指数，快慢手感一致
 
 ## 4. 让位检测的实现
 
-`design-v0.1.md` 3.2 的四个判据，落地时有三处细节决定成败。
+`design-v0.1.md` 3.2 的五个判据，落地时有五处细节决定成败。
 
 ### 4.1 基线必须在 click 里同步取
 
 ```js
-function snapshot(x, y) {
+function snapshot(x, y, img) {
   return {
     href: location.href,
     fullscreen: document.fullscreenElement,
     scrollLocked: scrollLocked(),
     hit: document.elementFromPoint(x, y),
+    skin: skinChain(img),   // 图自己 + 五层容器的 style/class，见 4.5
     x, y,
   };
 }
@@ -147,6 +148,7 @@ function snapshot(x, y) {
 ```js
 function acted(b) {
   if (location.href !== b.href) return true;                    // 最便宜
+  if (skinChanged(b.skin)) return true;                         // 十几次属性读取，见 4.5
   if (document.fullscreenElement !== b.fullscreen) return true;
   const hit = document.elementFromPoint(b.x, b.y);              // 中等
   if (hit !== b.hit && !isOurs(hit)) return true;
@@ -184,6 +186,47 @@ return !!under && under !== b.hit;
 ```
 
 `acted()` 不受影响：它在 overlay 打开**之前**调用，那时 host 还不存在。两条路径用两种取法，是刻意的。
+
+### 4.5 就地放大：站点改的是这张图，或它的盒子
+
+Pexels 照片页的放大镜是同一张图的 `transform: scale(3)`，写在 `<img>` 的行内 style 上。它躲过了前四个判据的全部：没有导航、没有全屏、没有滚动锁，`elementFromPoint(x, y)` 依然是**同一个元素**——缩放改变的是它的绘制，不是它的身份。
+
+所以多存一份「这个元素自己的外观」：
+
+```js
+function skinOf(el) {
+  return (el.getAttribute('style') || '') + '\n' + (el.getAttribute('class') || '');
+}
+```
+
+再把范围从 `<img>` 扩到它的盒子——**图自己 + 往上五层，到 body 为止**：
+
+```js
+function skinChain(el) {
+  const out = [{ el, skin: skinOf(el) }];
+  let n = el.parentElement;
+  for (let i = 0; i < 5 && n; i++, n = n.parentElement) {
+    if (n === document.body || n === document.documentElement) break;
+    out.push({ el: n, skin: skinOf(n) });
+  }
+  return out;
+}
+```
+
+往上认，是因为同一个放大镜可以换个写法：class 加在包着图的容器上、CSS 去缩里面的图，图自己的属性一个字都不变。停下是因为 `body` / `html` 的 class 常年被菜单、主题、弹窗改写，那不是这次点击的证据；而真正的放大盒不会离图五层以上。
+
+存的是**元素引用 + 当时的签名**，不是重新走一遍 `parentElement`：页面中途换了包裹层时，按结构重走会得到一条不同的链，白白让位。
+
+**为什么是属性，不是几何。** `getBoundingClientRect()` 看起来更直接，但 `hover` 缩放、`transform` 过渡都是几何变化而不写属性——按几何判，所有带悬停放大的图库都会静默失效。而「点击之后站点改写了这张图自己（或它的盒子）」几乎只出现在「它认领了这次点击」的场合。
+
+**为什么来得及。** 站点是在自己的 `click` 处理器里写 style / class 的，我们的捕获监听在 window 上先跑（取基线），`settle` 在下一帧（读变化），中间隔着一整个事件的传播。真机 Pexels 实测：基线 `transform:none`，下一帧 `scale(3)`，判据命中，overlay 一次都没出现。
+
+**覆盖不到的。**
+- 写在 `body` / `html` 上，或点击 600 ms 之后才写（迟到纠正只看命中点）；
+- 只改 `src` / `srcset` / `data-*`——与懒加载的换图、换状态属性无法区分，故意不收；
+- 只走 `element.animate()` 或内部 JS 状态、不写任何属性——隔离世界观测不到。
+
+这三条都在 `design-v0.1.md` §8 的失败模式表里。按第二条，它们的方向都是「漏开」，可以接受。
 
 ---
 
