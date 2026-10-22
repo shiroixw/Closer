@@ -20,6 +20,10 @@
 **同日第八轮（Pexels 的放大镜）**：照片页点大图，站点把 `transform: scale(3)` 写回同一个 `<img>`，随后随鼠标平移——图没换、位置没动、命中点仍是同一个元素，四个判据全哑，于是两层缩放叠加，关掉大图后页面停在放大态（cases 007）。让位检测加第 5 判据「被点图片（或离它五层以内的容器）的 `style`/`class` 被改写」（D30），e6 新增 zoom / box 两个场景；真机 Pexels 39700690 上 overlay 一次都没出现，本地桩页三种形态（plain 开、图放大让、容器放大让）全部符合预期。
 **案例编号说明**：Pexels 那条原本记在 i18n 分支上的 `cases 004`，合入时 main 已占用 004/005/006，故整条重编为 007（引用它的 decisions D30、design §8、yield.js 注释同步）。
 
+**2026-10-22 第九轮（兄弟遮罩，cases 009）**：知乎文章页的查看器把遮罩和图做成 `<body>` 下的**兄弟**——`remember()` 要求「覆盖 90% 视口的祖先」，两条前提同时落空，`state.shell` 从未写入。点图缩小那一下只改 `transform`，而且**改写落在我们判定之后**（真机 5/5：决策帧 2.8 ms、首次 `style` 写入 9.4 ms），所以 D30 的 `skin` 在这里永远晚一步；`href` / 全屏 / 命中点 / 滚动锁也全哑。结果叠一层，600 ms 后被迟到纠正关掉。修法是给 `shelled()` 加静态存量分支 `state.yielded && cursor === 'zoom-out'`（D31）——cursor 是**状态**，读一次就知道站在哪儿，不依赖帧序；判断器不动，D10 不撤回。`e10` 新增 sibling 场景 B1–B5（改写放进 rAF，因为同步改写的话 `skin` 会替这桩 case 兜住，测不出差别），smoke 43 → 52。
+**同日补一层（真机第二次复验暴露）**：修完仍是「访问页面后第一次缩小会叠、之后不叠」。原因是放大那一下站点把被点的缩略图设成 `visibility:hidden`，`acted()` 走 `skin` 分支直接 return，`remember()` 一次都不跑 → `state.yielded` 一直是 false，直到第一次缩小的迟到纠正才落账。把 `skin` 分支也置位后，桩页同步补上「点缩略图时把它设成 hidden」，B2 才能测出这个缺口；真机复验待做（需再刷一次扩展）。
+**编号说明**：PR #10（iWiki/tdesign，点击点落在遮罩上）占用 008，本轮直接用 009。
+
 代码写完了，131 项自动断言全绿。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
 所以 **`安装 → welcome → 点 Enable → 授权 → 动态注册` 这条链路一次都没被真人走通过**。
 按 `docs/manual-check.md` 走一遍（16 条），才算真的可上架。
@@ -27,9 +31,9 @@
 | 验收 | 结果 |
 |---|---|
 | `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 27/27、尺寸与文件名 31/31、顶层声明 35 个无撞名） |
-| `npm run smoke` | ⚠️ 合并前 main 43/43（2026-10-21 Windows 本机）；本轮把 zoom / box 用例并进 e6 后**未复跑**（B6，需开 9333 的 Chrome） |
+| `npm run smoke` | ✅ **52/52**（e4 15 + e6 16 + e10 16 + e7 5），2026-10-22 Windows 本机复跑。**假红要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败（本次见过 e10 6 条、e4 5 条），原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
 | `npm run live` | ⚠️ 未复跑（依赖外网真实站点；本轮只动让位路径，e5 的旧结果保留） |
-| content 侧体积 | ✅ **54.0 KB / 60 KB**（余量 6.0 KB；i18n 与让位第 5 判据均已计入） |
+| content 侧体积 | ⚠️ **57.7 KB / 60 KB**（余量 2.3 KB；D31 之后余量首次低于 3 KB，下一条功能要先腾地方） |
 | 速度（CPU 4×） | ✅ judge **0.010 ms** · 首帧 **34.2 ms** · 加载期 **2 个**监听（用满第六条的预算；合并后未复跑） |
 
 ## 模块状态
@@ -39,8 +43,8 @@
 | 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` 27/27（含 cursor:pointer 3 条、正方形 5 条） |
 | 点击目标解析 `pick()` | `src/content/detect.js` | ✅ | target 不是图时按命中点栈找回，并逐层下钻 shadow root（`cases.md` 004 / 005）；e4 两条形态断言 + 真实图库页实测 |
 | 点击契约（§3.1 四条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区 / 点中链接或控件，都在 `judge()` 之前判掉；e4 与 e5 全绿 |
-| 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 12/12（含「查看器里再点一次」S3、慢挂后 L4）+ 本轮新增 zoom / box（未复跑）；e10 11/11（缩到 0.35 仍不接管、层关闭后自愈 S4） |
-| 存量判据 `shelled()` | `src/content/yield.js` | ✅ | `acted()` 命中时 `remember()` 记下盖住视口的那一层；`isConnected` 或覆盖失效即忘掉（D28） |
+| 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 16/16（含「查看器里再点一次」S3、慢挂后 L4、zoom / box）；e10 16/16（缩到 0.35 仍不接管、层关闭后自愈 S4、兄弟遮罩 B1–B5）；知乎真机修前 5/5 复现 |
+| 存量判据 `shelled()` | `src/content/yield.js` | ✅ | 两条：`remember()` 记下盖住视口的那一层（`isConnected` 或覆盖失效即忘掉，D28）；层记不下来时用 `state.yielded && cursor === 'zoom-out'`（D31，cases 009） |
 | 增量判据 `skinChanged()` | `src/content/yield.js` | ✅ 真机已验 | 被点图片、或离它五层以内容器的 `style` / `class` 被改写即退场（D30）；e6 zoom（图自己）/ box（容器）；真机 Pexels 39700690 已验 |
 | 命名空间 / 偏好 / 暂停列表 | `src/content/core.js` | ✅ | — |
 | 尺寸比例格式 | `src/content/meta.js` | ✅ | `test-meta` 31/31（含 fileName） |
@@ -75,6 +79,7 @@
 | T15 | 点击目标解析：图被透明装饰盖住时不生效 | 点遮罩能打开下面的图；点链接/控件仍放行；shadow tree 内同样成立 | ✅ e4 15/15（light DOM + Web Component 两条）+ 真实图库页实测打开 |
 | T16 | 叠层查看器：站点查看器开着时再点图不接管（cases 006） | 第二次点击不接管；站点缩到 25% 仍不接管；app 外壳里的缩略图照常打开；关掉查看器后自愈 | ✅ e10 11/11 + e6 S3/L4 |
 | T17 | 中英国际化（D29） | 浏览器语言是中文时，manifest / popup / welcome / overlay 全中文且没有一处露出 key 名；`verify` 含语言包检查 | ✅ `check-i18n` 通过（临时去掉一个占位符 → 退出码 1 并指名 key）；zh-CN 真机已验 manifest / popup / welcome，overlay 见 manual-check 17 |
+| T18 | 兄弟遮罩：查看器把遮罩和图并列时的让位（cases 009） | 缩小那一下不接管、不闪烁；普通图不被连累；关掉后自愈 | ✅ e10 16/16（B1–B5，修前 B2 红）；真机知乎**待复验**（需刷新扩展） |
 
 ## 中断规则（这条最重要）
 
@@ -108,6 +113,8 @@
 
 | bug | 怎么发现的 | 断言 |
 |---|---|---|
+| **遮罩与图并列时，缩小那一下又叠一层**（用户报的 bad case，cases 009）：知乎的查看器把遮罩和图都挂在 `<body>` 下，是兄弟不是祖先；点图缩小只改 `transform`，而且改写落在**我们判定之后**——五判据（含 `skin`）全哑，`remember()` 又记不下任何东西 → 叠一层，600 ms 后被迟到纠正关掉（真机 17 ms 开、618 ms 关） | 用户给 URL；真机插桩：文章图点击 → 站点同步挂查看器（我们让位）；查看器里再点 → `style` 首次写入 9.4 ms、我们决策帧 2.8 ms，5/5 都晚一步；`skin` 在桩页里同步改写时是有效的，改成 rAF 改写立刻复现（所以桩页必须复刻这个时序） | `shelled()` 加静态存量分支（D31）；`e10` B1–B5（修前 B2 红、修后绿）；同页 12 张图 `zoom-out` 误伤计数 0 |
+| **修完仍「第一次缩小会叠、后续不叠」**：放大那一下站点把被点的缩略图设成 `visibility:hidden`，`acted()` 走 `skin` 分支直接 return，`remember()` 一次都不跑 → `state.yielded` 到第一次缩小之后才落账 | 真机复验发现；桩页补上「点缩略图时设 hidden」后 B2 转红，证明缺口就在这条分支 | `acted()` 的 `skin` 分支也置位 `state.yielded`；e10 B1–B5（16/16）；真机待复验 |
 | **站点自己的查看器开着时，点里面那张图会再叠一层**（用户报的 bad case，站点后来找不到了）：第一次点击站点弹出全屏遮罩并展示原图，第二次点遮罩里的图 → 我们也弹一层 | 用自包含桩页复现（e10 先红后绿）：第二次点击前后 `href` / 全屏 / 命中点 / 滚动锁四项完全一样，全部沉默；`zoom` 变体进一步证明连站点自己的缩放都看不见——命中点比的是元素身份，`transform` 不改身份。静态尺寸阈值也不行：站点一缩小，缩略图与查看器里的图分不出 | `e10` 11 条（static / zoom / zoomout / 自愈 / app 外壳）+ `e6` S3、L4 |
 | **同一形态的 Web Component 版仍然失效**：站点把「图 + 遮罩」放进 `open` shadow root。事件层是穿透的（`composedPath()[0]` 就是 shadow 里的遮罩），但 `document.elementsFromPoint` **只返回 host**，`pick()` 在 light DOM 里找不到图 → 又变成「点了没反应」。四形态实测顺带证明缺口不在「shadow 里的图」：直接点 shadow 内的 `<img>` 时 `composedPath()[0]` 就是 img，一直能打开 | 一次性实验页跑四形态：light 遮罩 ✓ / open shadow 遮罩 ✗ / open shadow 直接点图 ✓ / closed shadow ✗；修后同一脚本复跑：前三条全 ✓，closed 仍 ✗（边界） | `pick()` 增加逐层下钻 `shadowRoot`（≤ 3 层）；e4「shadow tree 里的遮罩：下钻后也能打开」（`cases.md` 005） |
 | **图库详情页点了没反应**（用户报）：图上方盖一层 `position:absolute; inset:0` 的透明致谢装饰，`cursor:auto`、无 `<a>`、无 `role`。`click` 的 target 是装饰层，`target.closest('img')` 为空，处理器在 `judge()` 之前就 return；页面自己也不响应，于是既没打开也没让位。<br>**判断器没有沉默**（925×573 / 830×514，十三条全过），沉默的是「点是哪张图」这一步——这是 `judge()` 管不到的地方 | 用户给 URL + 截图；用 `elementsFromPoint` 打出命中栈，第一层就是 `.photo__centered-frame__overlay`，它是图的兄弟节点 | 新增 `Closer.pick()`（检测 target 不是图时按命中点栈找回，要求共享非 `body` 祖先、装饰是链接/控件则放行）；e4「透明遮罩盖着的图，点遮罩也能打开」；真实页面实测 `pick` 命中、`judge` 为 true、overlay 打开 |
