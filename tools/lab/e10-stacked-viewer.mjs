@@ -18,10 +18,14 @@
 //   zoom     站点查看器，点图放大到 1.4    → 第二次点击不接管，站点缩放生效
 //   zoomout  站点查看器，点图缩到 0.35     → 缩到再小也不接管（与尺寸无关）
 //   sibling  查看器的遮罩与图是兄弟节点（tdesign / iWiki 形态）→ 第二次点击不接管
+//   sib      遮罩与图都挂 <body>、互为兄弟（知乎形态）→ 缩小那一下不接管（cases 009）
 //   shell    app 外壳（fixed 全屏）+ 小缩略图 → 照常打开（不整站失效）
 //
-// sibling 是真实站点补上的：遮罩与图不是父子而是兄弟，记在遮罩上的那一层
-// `contains(img)` 永远为假，等于没记——桩里把图放进同一个容器时这条漏得掉。
+// 两个兄弟场景不是重复，它们漏的是不同的东西：
+//   sibling —— 遮罩与图在同一个 fixed 容器里互为兄弟，记在遮罩上的那一层
+//              `contains(img)` 永远为假；remember() 往上扩到容器才接得住。
+//   sib     —— 遮罩与图都在 <body> 下，图的祖先链一步就到 body，一个层也记不下；
+//              只能靠 cursor: zoom-out 这份存量证据（cases 009）。
 //
 // 页面用 http://127.0.0.1 提供：扩展的 matches 是 *://*/*，file:// 不在其中。
 
@@ -103,6 +107,10 @@ const PAGE = `<!doctype html>
   .viewer-mask { position: absolute; inset: 0; }
   .viewer-pic { position: absolute; left: 10px; top: 10px; width: 160px; }
   .viewer-pic img { width: 100%; height: auto; }
+  /* 知乎形态：遮罩与图都挂在 <body> 下，是兄弟而不是祖先；图不盖住视口，也不锁滚动。 */
+  .sib-backdrop { position: fixed; inset: 0; z-index: 99998; background: rgba(14,15,15,.65); }
+  .sib-photo { position: absolute; left: 50%; top: 50%; width: 620px; z-index: 99999;
+    cursor: zoom-out; transform: translate(-50%,-50%) scale(1.4); transition: transform 300ms ease; }
   h3 { font-size: 13px; color: #666; margin: 0 0 6px; }
 </style>
 
@@ -111,6 +119,7 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>zoom — 站点查看器，点图放大</h3><img id="zoom" src="/photo.png" alt="zoom"></div>
 <div class="case"><h3>zoomout — 站点查看器，点图缩小</h3><img id="zoomout" src="/photo.png" alt="zoomout"></div>
 <div class="case"><h3>sibling — 遮罩与图是兄弟（tdesign / iWiki 形态）</h3><img id="sibling" src="/photo.png" alt="sibling"></div>
+<div class="case"><h3>sib — 遮罩与图并列，图不盖住视口（知乎形态）</h3><img id="sib" src="/photo.png" alt="sib"></div>
 
 <script>
 function openViewer() {
@@ -127,7 +136,7 @@ function openViewer() {
 
 // sibling：遮罩和图是兄弟。真实站点（tdesign 的 __modal-mask / __modal-pic）就是这个结构，
 // 命中点落在遮罩上，只记遮罩的话 contains(img) 永远为假。
-function openSiblingViewer() {
+function openMaskPicViewer() {
   const v = document.createElement('div');
   v.className = 'viewer';
   const mask = document.createElement('div');
@@ -154,10 +163,38 @@ function zoomOn(im, to) {
   });
 }
 
+// 知乎形态：遮罩与图都挂在 <body> 下，是兄弟而不是祖先。两个细节照真实站点抄：
+//   1. 遮罩不包着图 —— remember() 要求「覆盖 90% 视口的祖先」，在这里落空；
+//   2. 改写 style 的那一下排在**我们判定之后**（同一个任务里后注册的 rAF）——
+//      skin 判据因此总是晚一步，只剩 cursor: zoom-out 这份存量证据可用（cases 009）。
+function openBodySiblingViewer() {
+  const bd = document.createElement('div');
+  bd.className = 'sib-backdrop';
+  const im = document.createElement('img');
+  im.className = 'sib-photo';
+  im.src = '/photo.png';
+  document.body.append(bd, im);
+  im.addEventListener('click', () => {
+    window.__sibShrink = true;
+    requestAnimationFrame(() => {
+      im.style.transform = 'translate(-50%,-50%) scale(1)';
+      setTimeout(() => { bd.remove(); im.remove(); }, 300);
+    });
+  });
+  return im;
+}
+
 document.getElementById('static').addEventListener('click', () => { openViewer(); });
 document.getElementById('zoom').addEventListener('click', () => { zoomOn(openViewer(), 1.4); });
 document.getElementById('zoomout').addEventListener('click', () => { zoomOn(openViewer(), 0.35); });
-document.getElementById('sibling').addEventListener('click', () => { openSiblingViewer(); });
+document.getElementById('sibling').addEventListener('click', () => { openMaskPicViewer(); });
+document.getElementById('sib').addEventListener('click', () => {
+  // 知乎打开查看器时会把被点的缩略图设成 visibility:hidden。于是第一次放大走的是
+  // skin 判据（不是 hit），而 skin 那条分支没有层可记 —— 桩页必须复刻这一点，
+  // 否则 B2 测不出「skin 不落账」那个缺口，只会在真机上第一次缩小才翻车。
+  document.getElementById('sib').style.visibility = 'hidden';
+  openBodySiblingViewer();
+});
 </script>`;
 
 // app 外壳：整站内容躺在一个 fixed 全屏容器里，图只是里面一个小缩略图。
@@ -367,6 +404,34 @@ for (const [id, label, wantScale] of [
     await closeOurs();
   }
 }
+
+/* --- 兄弟遮罩：遮罩与图并列（知乎形态，cases 009） --- */
+
+await go(pageUrl, "!!document.getElementById('sib')");
+await ev('window.__sibShrink = false');
+await clickAt(await spotOf('#sib'));
+await sleep(700);
+const sibViewer = await ev("!!document.querySelector('.sib-photo')");
+const sibOurs = await has();
+check('B1 兄弟遮罩的查看器：第一次点击我们让位', sibViewer === true && sibOurs === false,
+  `viewer=${sibViewer} ours=${sibOurs}`);
+
+// 缩小那一下：元素身份不变、style 也在我们判定之后才写，四判据 + skin 全哑。
+// shell 同样记不下来（遮罩是兄弟），只剩 cursor: zoom-out 兜住这一下。
+await clickAt(await spotOf('.sib-photo'));
+await sleep(260);
+check('B2 查看器里点一下（缩小）：不接管', (await has()) === false);
+
+await sleep(700);
+const shrunk = await ev('window.__sibShrink === true');
+const gone = await ev("!document.querySelector('.sib-photo')");
+check('B3 站点自己的缩小生效，查看器随后卸载', shrunk === true && gone === true, `shrunk=${shrunk} gone=${gone}`);
+check('B4 缩小之后仍然不接管（没有迟到闪烁）', (await has()) === false);
+
+await clickAt(await spotOf('#plain'));
+await sleep(600);
+check('B5 查看器关掉后：普通图照常打开（存量判据不整站失效）', (await has()) === true);
+await closeOurs();
 
 /* --- app 外壳：fixed 全屏容器里的小缩略图 --- */
 

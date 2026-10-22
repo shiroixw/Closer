@@ -95,6 +95,9 @@ Closer.acted = function (b) {
   // 站点就地放大的形态：元素没换、位置没动，只有它自己（或它的盒子）被改写了。
   // 这条同样要 remember：站点改写属性时可能同时挂出一层（iWiki 的查看器既改图、
   // 又盖一层遮罩），漏记就等于下一次点击又叠一层（cases 007 / 008）。
+  // 也可能一个层都记不下来——知乎把缩略图设成 visibility:hidden，第一次放大走的是
+  // skin 而不是 hit，而它的遮罩是图的兄弟、祖先链一步就到 body（cases 009）。
+  // 记不下层不代表没接管：`remember()` 记不下层也会落「接管过」的账（D31 要用）。
   if (b.skin && skinChanged(b.skin)) {
     Closer.remember(document.elementFromPoint(b.x, b.y), b.hit);
     return 'skin';
@@ -128,7 +131,7 @@ function coversViewport(node) {
  * 归因来自「它是在这次点击之后出现的」，不来自猜测，所以不需要任何阈值
  * 去判断它「像不像查看器」。
  *
- * 传 null 就什么都不记：命中点上没有新东西（命中点没变、只是滚动被锁），
+ * 传 null 就记不下层：命中点上没有新东西（命中点没变、只是滚动被锁），
  * 说明页面没有把屏幕接管在那张图身上。
  *
  * anchor 是点击**之前**命中点上的元素（`snapshot()` 的 `hit`），用来区分
@@ -136,6 +139,11 @@ function coversViewport(node) {
  * 记成查看器就会让整站失效（cases 008）。
  */
 Closer.remember = function (node, anchor) {
+  // hit / scroll / skin / 迟到纠正几条让位路径都经过这里，所以「本页接管过」在这里落账。
+  // 它与「记住了哪一层」是两件事：层可能根本记不下来——站点把遮罩做成图的兄弟
+  // （cases 009），观测本身仍然成立，之后靠静态存量判据接着用（见 shelled）。
+  Closer.state.yielded = true;
+
   if (!node || Closer.isOurs(node)) return;
 
   // ① 从命中点往上找最近的那一层：页面刚盖在屏幕上的容器。
@@ -181,13 +189,23 @@ Closer.shelled = function (img) {
   if (document.fullscreenElement) return true; // 全屏时我们开了也看不见
 
   const shell = Closer.state.shell;
-  if (!shell) return false;
-
-  if (!shell.isConnected || !coversViewport(shell)) {
-    Closer.state.shell = null;
-    return false;
+  if (shell) {
+    if (!shell.isConnected || !coversViewport(shell)) {
+      Closer.state.shell = null; // 层被关掉、被卸载：判死并忘掉
+    } else if (shell.contains(img)) {
+      return true;
+    }
   }
-  return shell.contains(img);
+
+  // 有的站点根本不建「层」：知乎把遮罩和图做成 <body> 下的兄弟节点，图的祖先链一步
+  // 就到 body，remember() 一个东西也记不下（cases 009）。它留下的唯一痕迹是指针——
+  // 查看器里那张图的 cursor 是 zoom-out。这是**状态**，不是变化：读一次就知道站在
+  // 哪儿，不依赖帧序，也不需要观察窗口。所以它比 skin 更稳：知乎在**我们判定之后**
+  // 才写 style（实测决策帧 2.8 ms、写入 9.4 ms），第 5 判据那天总是晚一步（D31）。
+  //   只认 zoom-out：zoom-in 有方向歧义，只写了样式、没有处理器的图也会声明它（D10）；
+  //   还要 yielded：cursor 是声明不是观测，单独拿它当预言会误伤那类页面（tech-spec c4）。
+  //   观测在先，声明只用来延长观测的寿命。
+  return Closer.state.yielded && getComputedStyle(img).cursor === 'zoom-out';
 };
 
 // 迟到纠正只关心一件事：点击点是不是被页面盖住了。
