@@ -12,12 +12,16 @@
 // 页面出手的那一刻记下它多出来的那一层（Closer.state.shell），后续点击只要还
 // 在那层里就继续让位；层被卸载即忘掉。所以下面每条断言都只问「叠没叠」。
 //
-// 五个场景，两个本地页：
+// 六个场景，两个本地页：
 //   plain    普通文章图，无处理器          → 我们开（环境 sanity）
 //   static   站点查看器，点图无动作        → 第二次点击不接管
 //   zoom     站点查看器，点图放大到 1.4    → 第二次点击不接管，站点缩放生效
 //   zoomout  站点查看器，点图缩到 0.35     → 缩到再小也不接管（与尺寸无关）
+//   sibling  查看器的遮罩与图是兄弟节点（tdesign / iWiki 形态）→ 第二次点击不接管
 //   shell    app 外壳（fixed 全屏）+ 小缩略图 → 照常打开（不整站失效）
+//
+// sibling 是真实站点补上的：遮罩与图不是父子而是兄弟，记在遮罩上的那一层
+// `contains(img)` 永远为假，等于没记——桩里把图放进同一个容器时这条漏得掉。
 //
 // 页面用 http://127.0.0.1 提供：扩展的 matches 是 *://*/*，file:// 不在其中。
 
@@ -95,6 +99,10 @@ const PAGE = `<!doctype html>
   .viewer { position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,.93);
     display: grid; place-items: center; }
   .viewer img { max-width: 90vw; max-height: 85vh; width: auto; height: auto; }
+  /* sibling 形态：遮罩与图是兄弟，图缩在左上角——点击点落在遮罩上，不落在图上。 */
+  .viewer-mask { position: absolute; inset: 0; }
+  .viewer-pic { position: absolute; left: 10px; top: 10px; width: 160px; }
+  .viewer-pic img { width: 100%; height: auto; }
   h3 { font-size: 13px; color: #666; margin: 0 0 6px; }
 </style>
 
@@ -102,6 +110,7 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>static — 站点查看器，点图无动作</h3><img id="static" src="/photo.png" alt="static"></div>
 <div class="case"><h3>zoom — 站点查看器，点图放大</h3><img id="zoom" src="/photo.png" alt="zoom"></div>
 <div class="case"><h3>zoomout — 站点查看器，点图缩小</h3><img id="zoomout" src="/photo.png" alt="zoomout"></div>
+<div class="case"><h3>sibling — 遮罩与图是兄弟（tdesign / iWiki 形态）</h3><img id="sibling" src="/photo.png" alt="sibling"></div>
 
 <script>
 function openViewer() {
@@ -113,6 +122,26 @@ function openViewer() {
   d.appendChild(im);
   document.body.appendChild(d);
   document.body.style.overflow = 'hidden'; // 真实查看器几乎都会锁滚动
+  return im;
+}
+
+// sibling：遮罩和图是兄弟。真实站点（tdesign 的 __modal-mask / __modal-pic）就是这个结构，
+// 命中点落在遮罩上，只记遮罩的话 contains(img) 永远为假。
+function openSiblingViewer() {
+  const v = document.createElement('div');
+  v.className = 'viewer';
+  const mask = document.createElement('div');
+  mask.className = 'viewer-mask';
+  const pic = document.createElement('div');
+  pic.className = 'viewer-pic';
+  const im = document.createElement('img');
+  im.id = 'bigSibling';
+  im.src = '/photo.png';
+  pic.appendChild(im);
+  v.appendChild(mask);
+  v.appendChild(pic);
+  document.body.appendChild(v);
+  document.body.style.overflow = 'hidden';
   return im;
 }
 
@@ -128,6 +157,7 @@ function zoomOn(im, to) {
 document.getElementById('static').addEventListener('click', () => { openViewer(); });
 document.getElementById('zoom').addEventListener('click', () => { zoomOn(openViewer(), 1.4); });
 document.getElementById('zoomout').addEventListener('click', () => { zoomOn(openViewer(), 0.35); });
+document.getElementById('sibling').addEventListener('click', () => { openSiblingViewer(); });
 </script>`;
 
 // app 外壳：整站内容躺在一个 fixed 全屏容器里，图只是里面一个小缩略图。
@@ -305,6 +335,7 @@ for (const [id, label, wantScale] of [
   ['static', 'S', ''],
   ['zoom', 'Z', 'scale(1.4)'],
   ['zoomout', 'O', 'scale(0.35)'],
+  ['sibling', 'M', ''],
 ]) {
   await go(pageUrl, "!!document.getElementById('plain')");
 

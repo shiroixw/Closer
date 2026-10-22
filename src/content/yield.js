@@ -93,17 +93,22 @@ Closer.snapshot = function (x, y, img) {
 Closer.acted = function (b) {
   if (location.href !== b.href) return 'href';
   // 站点就地放大的形态：元素没换、位置没动，只有它自己（或它的盒子）被改写了。
-  if (b.skin && skinChanged(b.skin)) return 'skin';
+  // 这条同样要 remember：站点改写属性时可能同时挂出一层（iWiki 的查看器既改图、
+  // 又盖一层遮罩），漏记就等于下一次点击又叠一层（cases 007 / 008）。
+  if (b.skin && skinChanged(b.skin)) {
+    Closer.remember(document.elementFromPoint(b.x, b.y), b.hit);
+    return 'skin';
+  }
   if (!!document.fullscreenElement !== b.fs) return 'fullscreen';
 
   const now = document.elementFromPoint(b.x, b.y);
   if (now !== b.hit && !Closer.isOurs(now)) {
-    Closer.remember(now);
+    Closer.remember(now, b.hit);
     return 'hit';
   }
 
   if (scrollLocked() !== b.locked) {
-    Closer.remember(now);
+    Closer.remember(now, b.hit);
     return 'scroll';
   }
   return '';
@@ -125,20 +130,42 @@ function coversViewport(node) {
  *
  * 传 null 就什么都不记：命中点上没有新东西（命中点没变、只是滚动被锁），
  * 说明页面没有把屏幕接管在那张图身上。
+ *
+ * anchor 是点击**之前**命中点上的元素（`snapshot()` 的 `hit`），用来区分
+ * 「页面刚开出来的一层」和「本来就在的全屏外壳」——后者把整个站点都圈在里面，
+ * 记成查看器就会让整站失效（cases 008）。
  */
-Closer.remember = function (node) {
+Closer.remember = function (node, anchor) {
   if (!node || Closer.isOurs(node)) return;
 
+  // ① 从命中点往上找最近的那一层：页面刚盖在屏幕上的容器。
+  let layer = null;
   for (let n = node, i = 0; n && i < SHELL_DEPTH; i++) {
     if (n === document.body || n === document.documentElement) return;
     if (coversViewport(n)) {
-      Closer.state.shell = n;
-      return;
+      layer = n;
+      break;
     }
     // 命中栈不穿 shadow（case 005），祖先链也不穿：走到 shadow root 就跳到 host。
     const root = n.getRootNode();
     n = n.parentElement || (root instanceof ShadowRoot ? root.host : null);
   }
+  if (!layer) return;
+
+  // ② 遮罩和图常常是兄弟（tdesign 的 `__modal-mask` 与 `__modal-pic`），只记命中点
+  //    落到的那一层，`contains(img)` 永远是假。往上扩到「这一层」的根：父级仍盖住
+  //    视口，且没有把点击前的那张图圈进来（圈进来就说明那层一直在，不是它开出来的）。
+  for (let p = layer.parentElement; p; p = p.parentElement) {
+    if (p === document.body || p === document.documentElement) break;
+    if (!coversViewport(p)) break;
+    if (anchor && p.contains(anchor)) break;
+    layer = p;
+  }
+
+  // ③ 页面本来就在的全屏外壳不算「它接管出来的那一层」，否则 app 外壳会让整站失效。
+  if (anchor && layer.contains(anchor)) return;
+
+  Closer.state.shell = layer;
 };
 
 /**
@@ -197,7 +224,7 @@ Closer.watchLate = function (b, onIntrude) {
     setTimeout(() => {
       const under = Closer.covered(b);
       if (!under) return;
-      Closer.remember(under);
+      Closer.remember(under, b.hit);
       onIntrude();
     }, ms)
   );
