@@ -201,15 +201,31 @@ return !!under && under !== b.hit;   // 现在返回 under 本身，供 4.5 记�
 所以再加一个**存量**判据，问的是一句话：页面是不是已经在自己开的那一层里展示这张图。
 
 ```js
-// 页面出手的那一刻：从它留在命中点上的节点往上，找第一个盖住 90% 视口的祖先。
-Closer.remember = function (node) {
+// 页面出手的那一刻：从命中点往上找它盖在屏幕上的那一层。anchor 是点击前命中点上的元素。
+Closer.remember = function (node, anchor) {
   if (!node || Closer.isOurs(node)) return;
+
+  // ① 命中点往上第一个盖住 90% 视口的祖先
+  let layer = null;
   for (let n = node, i = 0; n && i < 8; i++) {
     if (n === document.body || n === document.documentElement) return;   // body 是万能祖先
-    if (coversViewport(n)) { Closer.state.shell = n; return; }
+    if (coversViewport(n)) { layer = n; break; }
     const root = n.getRootNode();
     n = n.parentElement || (root instanceof ShadowRoot ? root.host : null);  // 祖先链不穿 shadow
   }
+  if (!layer) return;
+
+  // ② 扩到「这一层」的根：遮罩与图常常是兄弟，只记遮罩就 contains 不到图
+  for (let p = layer.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+    if (!coversViewport(p)) break;
+    if (anchor && p.contains(anchor)) break;   // 再往上就把点击前的页面圈进来了
+    layer = p;
+  }
+
+  // ③ 页面本来就在的全屏外壳不算「它接管出来的那一层」
+  if (anchor && layer.contains(anchor)) return;
+
+  Closer.state.shell = layer;
 };
 
 // 之后的每一次点击：只问那层还在不在、里面是不是这张图。
@@ -222,12 +238,13 @@ Closer.shelled = function (img) {
 };
 ```
 
-四个刻意的决定：
+五个刻意的决定：
 
-1. **挂接点复用既有的两处观测，不新增观察者。** `acted()` 命中时 `remember(now)`；`watchLate` 里 `covered()` 返回被谁盖住，同样 `remember(under)`——慢半拍的接管也是接管，不然它后面那一次点击照样会叠。
+1. **挂接点复用既有的两处观测，不新增观察者；但每个判据命中都要记。** `acted()` 里 `hit`、`scroll`、`skin` 三条命中路径都调 `remember(now, b.hit)`；`watchLate` 里 `covered()` 返回被谁盖住，同样记一次——慢半拍的接管也是接管，不然它后面那一次点击照样会叠。**只挂在 `hit` 上是不够的**：真实站点开查看器时往往同时改写被点图片的 `style`/`class`，`skin` 先命中就直接 return 了，`shell` 永远是空的（cases 008）。
 2. **不判断「它像不像查看器」。** 归因来自「它是在这次点击之后出现的」，这是证据不是猜测。所以没有图片尺寸、视口占比之类的阈值——站点把图缩到 25%、放大后拖到一边，结论不变。
-3. **`body` / `html` 永远不算那一层。** 否则 app 外壳（整站躺在 `fixed` 全屏容器里）会被认成查看器，整站失效（D24 的同一条教训）。
-4. **判死即忘。** `isConnected` 为假、或不再盖住视口（被 `display:none` 掉）就清空。状态自愈，没有过期时间，也不落 storage——不产生用户看不见的站点名单。
+3. **记这一层的「根」，但不圈进点击前那张图。** 遮罩与图在真实查看器里常常是兄弟（tdesign 的 `__modal-mask` / `__modal-pic`、iWiki 同理），只记住命中点落到的那一层，`contains(img)` 永远为假，等于没记；而一路爬到 `body` 又会把 app 外壳记成查看器。所以往上扩到「父级仍盖住视口、且没有把点击前那张图圈进来」为止，最后再用 `layer.contains(anchor)` 兜一次。锚点就是 `snapshot()` 里的 `hit`。
+4. **`body` / `html` 永远不算那一层。** 否则 app 外壳（整站躺在 `fixed` 全屏容器里）会被认成查看器，整站失效（D24 的同一条教训）。
+5. **判死即忘。** `isConnected` 为假、或不再盖住视口（被 `display:none` 掉）就清空。状态自愈，没有过期时间，也不落 storage——不产生用户看不见的站点名单。
 
 **不记在站点上。** 「点一次发现页面消费了 → 这个域名以后都不接管」看似更省事，但 `acted()` 命中的原因远不止查看器（点卡片展开、tab 切换、SPA 软导航、慢挂广告）。一次观测去赌整站行为，换来的是不可解释、不可逆的整站失效（D28）。
 

@@ -18,9 +18,10 @@
 **同日第六轮（i18n）**：中英两种语言落地。用浏览器内置的 `_locales` + `chrome.i18n`（零依赖、零检测逻辑、不进 content 预算），manifest 的 name/description 也跟着切；新增 `tools/check-i18n.mjs` 进 `verify`。这一步推翻 D8，按第十条把代价写进 D29，宪法「非目标」与 design §10 同步改写。
 **同日第七轮（中文露出的布局债）**：真机截图发现「暂停」竖排成两个字——长站点名是不可断开的 token，flex 项的 `min-width:auto` 让它拒绝变窄，把按钮压到一字宽。文案换成中文才露出来（英文没有断行点，只会溢出）。修在 `ui.css` 的组件层，e9 加两条几何断言。
 **同日第八轮（Pexels 的放大镜）**：照片页点大图，站点把 `transform: scale(3)` 写回同一个 `<img>`，随后随鼠标平移——图没换、位置没动、命中点仍是同一个元素，四个判据全哑，于是两层缩放叠加，关掉大图后页面停在放大态（cases 007）。让位检测加第 5 判据「被点图片（或离它五层以内的容器）的 `style`/`class` 被改写」（D30），e6 新增 zoom / box 两个场景；真机 Pexels 39700690 上 overlay 一次都没出现，本地桩页三种形态（plain 开、图放大让、容器放大让）全部符合预期。
+**2026-10-22 第九轮（cases 006 的真实形态，cases 008）**：用户拿 iWiki 文章页实测，两层查看器照样叠。真机上查到两个叠加的缺口：① 站点开查看器时改写了被点缩略图的 `style`/`class`，`acted()` 的 `skin` 判据**先命中并直接 return**，`remember()` 一次都没跑，`shell` 永远是空；② 即使跑到，命中点落在 `__modal-mask` 上，而遮罩与图是**兄弟节点**，`mask.contains(img)` 恒为假。修法：`skin` / `hit` / `scroll` 三条命中路径都记层，并带锚点 `b.hit`；记层时从命中点那一层往上扩到「这一层的根」（父级仍盖住视口、且没把点击前那张图圈进来），再用 `layer.contains(anchor)` 兜住本来就在的外壳。`e10` 新增 sibling 场景（M1/M2，先红后绿），真机 iWiki 两次点击 `#closer` 均为 0。
 **案例编号说明**：Pexels 那条原本记在 i18n 分支上的 `cases 004`，合入时 main 已占用 004/005/006，故整条重编为 007（引用它的 decisions D30、design §8、yield.js 注释同步）。
 
-**2026-10-22 第九轮（兄弟遮罩，cases 009）**：知乎文章页的查看器把遮罩和图做成 `<body>` 下的**兄弟**——`remember()` 要求「覆盖 90% 视口的祖先」，两条前提同时落空，`state.shell` 从未写入。点图缩小那一下只改 `transform`，而且**改写落在我们判定之后**（真机 5/5：决策帧 2.8 ms、首次 `style` 写入 9.4 ms），所以 D30 的 `skin` 在这里永远晚一步；`href` / 全屏 / 命中点 / 滚动锁也全哑。结果叠一层，600 ms 后被迟到纠正关掉。修法是给 `shelled()` 加静态存量分支 `state.yielded && cursor === 'zoom-out'`（D31）——cursor 是**状态**，读一次就知道站在哪儿，不依赖帧序；判断器不动，D10 不撤回。`e10` 新增 sibling 场景 B1–B5（改写放进 rAF，因为同步改写的话 `skin` 会替这桩 case 兜住，测不出差别），smoke 43 → 52。
+**同日（兄弟遮罩，cases 009）**：知乎文章页的查看器把遮罩和图做成 `<body>` 下的**兄弟**——`remember()` 要求「覆盖 90% 视口的祖先」，两条前提同时落空，`state.shell` 从未写入。点图缩小那一下只改 `transform`，而且**改写落在我们判定之后**（真机 5/5：决策帧 2.8 ms、首次 `style` 写入 9.4 ms），所以 D30 的 `skin` 在这里永远晚一步；`href` / 全屏 / 命中点 / 滚动锁也全哑。结果叠一层，600 ms 后被迟到纠正关掉。修法是给 `shelled()` 加静态存量分支 `state.yielded && cursor === 'zoom-out'`（D31）——cursor 是**状态**，读一次就知道站在哪儿，不依赖帧序；判断器不动，D10 不撤回。`e10` 新增 sibling 场景 B1–B5（改写放进 rAF，因为同步改写的话 `skin` 会替这桩 case 兜住，测不出差别），smoke 43 → 52。
 **同日补一层（真机第二次复验暴露）**：修完仍是「访问页面后第一次缩小会叠、之后不叠」。原因是放大那一下站点把被点的缩略图设成 `visibility:hidden`，`acted()` 走 `skin` 分支直接 return，`remember()` 一次都不跑 → `state.yielded` 一直是 false，直到第一次缩小的迟到纠正才落账。把 `skin` 分支也置位后，桩页同步补上「点缩略图时把它设成 hidden」，B2 才能测出这个缺口；真机复验待做（需再刷一次扩展）。
 **编号说明**：PR #10（iWiki/tdesign，点击点落在遮罩上）占用 008，本轮直接用 009。
 
@@ -31,10 +32,10 @@
 | 验收 | 结果 |
 |---|---|
 | `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 27/27、尺寸与文件名 31/31、顶层声明 35 个无撞名） |
-| `npm run smoke` | ✅ **52/52**（e4 15 + e6 16 + e10 16 + e7 5），2026-10-22 Windows 本机复跑。**假红要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败（本次见过 e10 6 条、e4 5 条），原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
+| `npm run smoke` | ⚠️ **合并后未复跑**（本机无 CDP 浏览器）。合并前两侧各自全绿：main 52/52（e4 15 + e6 16 + e10 16 + e7 5）、PR #10 49/49（e10 13）。合并后 e10 同时含 sibling（M1/M2）与 sib（B1–B5），预期 e10 18 条、合计 **54 条**；**假红要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败（见过 e10 6 条、e4 5 条），原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
 | `npm run live` | ⚠️ 未复跑（依赖外网真实站点；本轮只动让位路径，e5 的旧结果保留） |
-| content 侧体积 | ⚠️ **57.7 KB / 60 KB**（余量 2.3 KB；D31 之后余量首次低于 3 KB，下一条功能要先腾地方） |
-| 速度（CPU 4×） | ✅ judge **0.010 ms** · 首帧 **34.2 ms** · 加载期 **2 个**监听（用满第六条的预算；合并后未复跑） |
+| content 侧体积 | ⚠️ **59.1 KB / 60 KB**（余量 **0.9 KB**；合并后 `npm run verify` 实测。D31 与「记层带锚点」各自都不大，叠在一起几乎吃掉整条余量，下一条功能必须先腾地方） |
+| 速度（CPU 4×） | ⚠️ judge **0.010 ms** · 首帧 **34.2 ms** · 加载期 **2 个**监听（main 侧数字，合并后 e7 未复跑） |
 
 ## 模块状态
 
@@ -43,8 +44,8 @@
 | 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` 27/27（含 cursor:pointer 3 条、正方形 5 条） |
 | 点击目标解析 `pick()` | `src/content/detect.js` | ✅ | target 不是图时按命中点栈找回，并逐层下钻 shadow root（`cases.md` 004 / 005）；e4 两条形态断言 + 真实图库页实测 |
 | 点击契约（§3.1 四条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区 / 点中链接或控件，都在 `judge()` 之前判掉；e4 与 e5 全绿 |
-| 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 16/16（含「查看器里再点一次」S3、慢挂后 L4、zoom / box）；e10 16/16（缩到 0.35 仍不接管、层关闭后自愈 S4、兄弟遮罩 B1–B5）；知乎真机修前 5/5 复现 |
-| 存量判据 `shelled()` | `src/content/yield.js` | ✅ | 两条：`remember()` 记下盖住视口的那一层（`isConnected` 或覆盖失效即忘掉，D28）；层记不下来时用 `state.yielded && cursor === 'zoom-out'`（D31，cases 009） |
+| 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 16/16（含「查看器里再点一次」S3、慢挂后 L4、zoom / box）；e10 合并后 18 条（11 + 遮罩与图是兄弟 M1/M2 + 兄弟遮罩 B1–B5），**合并后待复跑**；知乎真机修前 5/5 复现 |
+| 存量判据 `shelled()` | `src/content/yield.js` | ✅ 真机已验 | 两条：① `skin` / `hit` / `scroll` / 迟到纠正四条路径都 `remember(now, b.hit)`，记到「这一层的根」并排除本来就含住那张图的外壳，`isConnected` 或覆盖失效即忘掉（D28，真机 iWiki 已验）；② 层记不下来时用 `state.yielded && cursor === 'zoom-out'`（D31，cases 009） |
 | 增量判据 `skinChanged()` | `src/content/yield.js` | ✅ 真机已验 | 被点图片、或离它五层以内容器的 `style` / `class` 被改写即退场（D30）；e6 zoom（图自己）/ box（容器）；真机 Pexels 39700690 已验 |
 | 命名空间 / 偏好 / 暂停列表 | `src/content/core.js` | ✅ | — |
 | 尺寸比例格式 | `src/content/meta.js` | ✅ | `test-meta` 31/31（含 fileName） |
@@ -123,6 +124,7 @@
 | **e6 在 `npm run smoke` 里偶发 3 项失败**（S1/L1/L3），单独连跑两次均 7/7。未定位，怀疑是 e4 之后的端口/时序残留 | 一次全量 smoke 出现，随后复跑不复现 | 待观察，暂不阻塞 |
 | **H5 活动页的卡片被接管**（用户报的 bad case）：整卡是 `<section>` + JS 事件委托，不是 `<a>`/`<button>`、无 role、无 onclick 属性，判断器前十条全漏；而它点击后只改自己某个元素的文字/class，`href`、`fullscreen`、命中点、滚动锁四个判据**全部沉默**——D9 的「行为即检测」在这个形态上有结构性盲区 | 用户提供页面与截图；实测点击后 `url` 未变、无弹层、无 fixed 覆盖、`body` 只长 28 字符 | 新增判断器第 11 条（`cursor:pointer` 认声明边界，D24）；e6 新增 card 用例，test-judge 加 3 条；真实页面上卡片被拦、页头大图仍能打开 |
 | **Pexels 照片页的放大镜被接管**（用户报的 bad case）：点大图，站点把 `transform: scale(3)` 写回同一个 `<img>`，随后随鼠标平移。图没换、位置没动、`href`/`fullscreen`/滚动锁/命中点全不变（缩放不改变元素身份），四个判据全哑，于是 Closer 与站点同时缩放；关掉大图后页面停在放大态 | 用户给页面链接；真机复现：`style` 由 `transform:none` 变 `scale(3)`，`elementFromPoint` 仍是同一个 `<img>` | 让位检测加第 5 判据「被点图片、或离它五层以内的容器的 `style`/`class` 被改写」（D30）；e6 新增 zoom（图自己）与 box（容器）两个场景；真机 Pexels 39700690 上点击后 overlay 一次都没出现，放大镜照常工作 |
+| **iWiki 文章页两层查看器照样叠**（cases 006 的真实形态，用户实测仍复现）：点文档配图 → 站点弹 tdesign 查看器；在查看器里再点 → 我们又叠一层 | 真机 Chrome + Closer 扩展复现（`#closer` 计数从 0 变 1），console 插桩显示第一次点击 `acted=skin` → 直接 return，`remember()` 没跑；补上后仍复现，再插桩发现记到的是 `__modal-mask`，而遮罩与图是兄弟，`contains(img)` 为假 | `acted()` 三条命中路径都记层并带锚点 `b.hit`；记层时扩到「这一层的根」且不圈进点击前那张图；`e10` 新增 sibling 场景 M1、M2（先红后绿），真机两次点击 `#closer` 均为 0 |
 | **popup 换背板，已打开的那张不跟着变**：`core.js` 的 `storage.onChanged` 只更新了 `state.prefs`，没让正在显示的 overlay 重新应用；要等下次点击才生效。暂停列表那条分支早就调了 `overlay.close()`，prefs 这条漏了 | 用户截图对比 | e9 六条：真扩展里点 popup 按钮，已打开的背板在 80 ms 内变色 |
 | **e7/e8/e9 会因窗口大小假红**：点击坐标取自元素几何，而这三个测试从不约束视口。窗口被缩到 583×311 后，1200×800 图的中心落在视口外，`elementFromPoint` 返回 null，报「overlay 没打开」——看起来像产品坏了 | 连跑 e7 三次稳定失败；加诊断打印 `vw/vh/at` 才看清 | 三个测试统一 `Emulation.setDeviceMetricsOverride` 1280×900，e7 连跑三次 5/5 |
 | **e5 用整页 outerHTML 长度当「DOM 已还原」的判据**：真实站点上第三方脚本随时改 DOM（实测评论区被挂 `style="!important"`，凭空 +19 字符），断言因此误红 | 打印首个差异位置，发现改动在 `#comments`，与图片查看无关 | 判据改为「`<html>` 属性与子节点数未变」，逐字节还原仍由 e4 在可控桩页面验 |
