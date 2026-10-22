@@ -55,6 +55,7 @@ Closer.state = {
   prefs: { ...DEFAULT_PREFS },
   host: null, // overlay 的 shadow host，由 overlay.js 建立
   shell: null, // 页面自己开的那一层，由 yield.js 记录与失效
+  yielded: false, // 本页有没有观测到页面接管过。只给静态存量判据用（见 yield.js）
 };
 
 /* ---------- 加载 ---------- */

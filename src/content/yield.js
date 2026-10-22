@@ -127,6 +127,11 @@ function coversViewport(node) {
  * 说明页面没有把屏幕接管在那张图身上。
  */
 Closer.remember = function (node) {
+  // hit / scroll / 迟到纠正三条让位路径都经过这里，所以「本页接管过」在这里落账。
+  // 它与「记住了哪一层」是两件事：层可能根本记不下来——站点把遮罩做成图的兄弟
+  // （cases 009），观测本身仍然成立，之后靠静态存量判据接着用（见 shelled）。
+  Closer.state.yielded = true;
+
   if (!node || Closer.isOurs(node)) return;
 
   for (let n = node, i = 0; n && i < SHELL_DEPTH; i++) {
@@ -154,13 +159,23 @@ Closer.shelled = function (img) {
   if (document.fullscreenElement) return true; // 全屏时我们开了也看不见
 
   const shell = Closer.state.shell;
-  if (!shell) return false;
-
-  if (!shell.isConnected || !coversViewport(shell)) {
-    Closer.state.shell = null;
-    return false;
+  if (shell) {
+    if (!shell.isConnected || !coversViewport(shell)) {
+      Closer.state.shell = null; // 层被关掉、被卸载：判死并忘掉
+    } else if (shell.contains(img)) {
+      return true;
+    }
   }
-  return shell.contains(img);
+
+  // 有的站点根本不建「层」：知乎把遮罩和图做成 <body> 下的兄弟节点，图的祖先链一步
+  // 就到 body，remember() 一个东西也记不下（cases 009）。它留下的唯一痕迹是指针——
+  // 查看器里那张图的 cursor 是 zoom-out。这是**状态**，不是变化：读一次就知道站在
+  // 哪儿，不依赖帧序，也不需要观察窗口。所以它比 skin 更稳：知乎在**我们判定之后**
+  // 才写 style（实测决策帧 2.8 ms、写入 9.4 ms），第 5 判据那天总是晚一步（D31）。
+  //   只认 zoom-out：zoom-in 有方向歧义，只写了样式、没有处理器的图也会声明它（D10）；
+  //   还要 yielded：cursor 是声明不是观测，单独拿它当预言会误伤那类页面（tech-spec c4）。
+  //   观测在先，声明只用来延长观测的寿命。
+  return Closer.state.yielded && getComputedStyle(img).cursor === 'zoom-out';
 };
 
 // 迟到纠正只关心一件事：点击点是不是被页面盖住了。
