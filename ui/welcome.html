@@ -3,26 +3,25 @@
 <title>Closer</title>
 <link rel="stylesheet" href="ui.css">
 
+<!-- 文案不写在这里：每一个 data-i18n 都是 _locales/*/messages.json 里的一个 key -->
+
 <body class="wide">
   <h1>Closer</h1>
-  <p>Click any image to view it full size, in place, at its real dimensions.</p>
+  <p data-i18n="welcomeIntro"></p>
 
   <div class="row" style="margin-top:26px">
-    <span>Site access</span>
-    <button id="perm" class="primary">Allow on all sites</button>
+    <span data-i18n="siteAccess"></span>
+    <button id="perm" class="primary" data-i18n="allowAll"></button>
   </div>
-  <p class="note" style="margin-top:8px">
-    Closer needs to see every page to decide which images are worth opening — that's the whole product.
-    It reads nothing else: no page text, no form values, no history, no cookies. No network requests, no analytics.
-    You can revoke this here or from <code>chrome://extensions</code> at any time.
-  </p>
+  <p class="note" style="margin-top:8px" data-i18n-html="welcomeNote"></p>
 
   <div class="row" style="margin-top:30px">
-    <span>Paused sites</span>
+    <span data-i18n="pausedSites"></span>
     <span class="host" id="count" style="color:var(--dim)">—</span>
   </div>
   <ul id="list"></ul>
-  <p class="note" id="empty">Nothing paused. When a site has its own viewer or gets in the way, hit <strong>Pause on …</strong> inside the info panel.</p>
+  <p class="note" id="empty" data-i18n-html="welcomeEmpty"></p>
 
+  <script src="i18n.js"></script>
   <script src="welcome.js"></script>
 </body>

@@ -78,7 +78,8 @@ var Closer = (window.Closer ||= {});
     // 这条路径一个字节都不改——不拦默认行为，站点自己的放大缩小照常。
     if (Closer.shelled(img)) return;
 
-    const base = Closer.snapshot(e.clientX, e.clientY);
+    // 第三参 img 供 skin 判据记基线（case 007：站点就地放大，元素身份不变）
+    const base = Closer.snapshot(e.clientX, e.clientY, img);
     e.preventDefault(); // 只掐默认行为，不阻断传播：页面自己的处理器照常跑
 
     settle(() => {

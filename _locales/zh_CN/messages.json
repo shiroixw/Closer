@@ -1,0 +1,144 @@
+{
+  "appName": {
+    "message": "Closer — 点任意图片，按原尺寸查看"
+  },
+  "appDesc": {
+    "message": "点任意图片，就地按原尺寸展开，并报出它的真实像素尺寸。不埋点，无构建步骤。"
+  },
+
+  "statusChecking": {
+    "message": "检查中…"
+  },
+  "statusOn": {
+    "message": "已在所有站点生效"
+  },
+  "statusOff": {
+    "message": "尚未启用"
+  },
+  "needsAccess": {
+    "message": "需要网站访问权限"
+  },
+  "allow": {
+    "message": "允许"
+  },
+  "thisPage": {
+    "message": "当前页面"
+  },
+  "pause": {
+    "message": "暂停"
+  },
+  "resume": {
+    "message": "恢复"
+  },
+  "backdrop": {
+    "message": "背景"
+  },
+  "backdropDark": {
+    "message": "深色"
+  },
+  "backdropLight": {
+    "message": "浅色"
+  },
+  "backdropChecker": {
+    "message": "棋盘"
+  },
+  "popupNote": {
+    "message": "点任意图片即可看原尺寸。<strong>暂停</strong>只对这一家网站生效。"
+  },
+
+  "welcomeIntro": {
+    "message": "点任意图片，就地按它真实的尺寸查看。"
+  },
+  "siteAccess": {
+    "message": "网站访问权限"
+  },
+  "allowAll": {
+    "message": "在所有站点上允许"
+  },
+  "revokeAll": {
+    "message": "撤销访问权限"
+  },
+  "welcomeNote": {
+    "message": "Closer 需要看到每一个页面，才能判断哪张图值得打开——这就是产品本身。除此之外它什么都不读：不读正文、不读表单值、不读历史、不读 Cookie。不发起网络请求，不做任何统计。你可以随时在这里或 <code>chrome://extensions</code> 里撤销。"
+  },
+  "pausedSites": {
+    "message": "已暂停的站点"
+  },
+  "welcomeEmpty": {
+    "message": "还没有暂停任何站点。某个站点自带查看器或者挡住你时，点信息面板里的<strong>「在 … 上暂停」</strong>。"
+  },
+  "pausedCountOne": {
+    "message": "1 个站点"
+  },
+  "pausedCountMany": {
+    "message": "$N$ 个站点",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+
+  "viewerLabel": {
+    "message": "图片查看器"
+  },
+  "infoLabel": {
+    "message": "图片信息"
+  },
+  "infoTitle": {
+    "message": "图片信息 (I)"
+  },
+  "copyLabel": {
+    "message": "复制图片"
+  },
+  "copyTitle": {
+    "message": "复制图片（⇧ 点击：复制地址）"
+  },
+  "saveLabel": {
+    "message": "保存图片"
+  },
+  "saveTitle": {
+    "message": "保存图片"
+  },
+  "closeLabel": {
+    "message": "关闭"
+  },
+  "closeTitle": {
+    "message": "关闭 (Esc)"
+  },
+  "shownDims": {
+    "message": "显示 $W$ × $H$",
+    "placeholders": {
+      "w": {
+        "content": "$1",
+        "example": "800"
+      },
+      "h": {
+        "content": "$2",
+        "example": "600"
+      }
+    }
+  },
+  "pauseOn": {
+    "message": "在 $SITE$ 上暂停",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "pauseOnThisSite": {
+    "message": "在此站点上暂停"
+  },
+  "copyTooLarge": {
+    "message": "图片过大，已改为复制地址"
+  },
+  "copyFailed": {
+    "message": "复制失败"
+  },
+  "saveFailed": {
+    "message": "保存失败"
+  }
+}

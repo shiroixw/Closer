@@ -62,8 +62,22 @@ p { margin: 0; color: var(--dim); }
 
 .host { font-variant-numeric: tabular-nums; }
 
+/* 站点名是一个不可断开的 token（超长子域，或 popup 被当成标签页打开时的扩展 id）。
+   flex 项的 min-width 默认是 auto = 内容的 min-content，于是它拒绝变窄，
+   把同一行的按钮挤到只剩一个字宽；按钮里是中文时每个字都是断行点，就折成两行。
+   文本让位并截断（完整值挂到 title，见 popup.js / welcome.js），按钮永不折行、也不参与收缩。 */
+.host,
+li > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 button {
   appearance: none;
+  flex: none;
+  white-space: nowrap;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
@@ -80,7 +94,7 @@ button.primary { background: #f4f4f5; color: #18181b; border-color: #f4f4f5; fon
 button.primary:hover { background: #fff; }
 button:disabled { opacity: 0.45; cursor: default; }
 
-.seg { display: flex; gap: 6px; }
+.seg { display: flex; gap: 6px; flex: none; }
 .seg button { padding: 5px 9px; }
 .seg button[aria-pressed="true"] { border-color: #f4f4f5; color: #fff; background: #26262c; }
 

@@ -3,28 +3,31 @@
 <title>Closer</title>
 <link rel="stylesheet" href="ui.css">
 
+<!-- 文案不写在这里：每一个 data-i18n 都是 _locales/*/messages.json 里的一个 key -->
+
 <h1>Closer</h1>
-<p id="status"><span class="dot off"></span><span id="statusText">Checking…</span></p>
+<p id="status"><span class="dot off"></span><span id="statusText" data-i18n="statusChecking"></span></p>
 
 <div class="row" id="permRow" hidden>
-  <span class="host">Needs site access</span>
-  <button id="perm" class="primary">Allow</button>
+  <span class="host" data-i18n="needsAccess"></span>
+  <button id="perm" class="primary" data-i18n="allow"></button>
 </div>
 
 <div class="row">
   <span class="host" id="host">—</span>
-  <button id="pause" disabled>Pause</button>
+  <button id="pause" disabled data-i18n="pause"></button>
 </div>
 
 <div class="row">
-  <span>Backdrop</span>
+  <span data-i18n="backdrop"></span>
   <span class="seg" id="backdrop">
-    <button data-v="dark" aria-pressed="true">Dark</button>
-    <button data-v="light" aria-pressed="false">Light</button>
-    <button data-v="checker" aria-pressed="false">Checker</button>
+    <button data-v="dark" aria-pressed="true" data-i18n="backdropDark"></button>
+    <button data-v="light" aria-pressed="false" data-i18n="backdropLight"></button>
+    <button data-v="checker" aria-pressed="false" data-i18n="backdropChecker"></button>
   </span>
 </div>
 
-<p class="note">Click any image to see it full size. <strong>Pause</strong> turns Closer off for this site only.</p>
+<p class="note" data-i18n-html="popupNote"></p>
 
+<script src="i18n.js"></script>
 <script src="popup.js"></script>

@@ -1,0 +1,144 @@
+{
+  "appName": {
+    "message": "Closer — Click any image to view it full size"
+  },
+  "appDesc": {
+    "message": "Click any image to open it full size, in place, with its real dimensions. No tracking, no build step."
+  },
+
+  "statusChecking": {
+    "message": "Checking…"
+  },
+  "statusOn": {
+    "message": "On for every site"
+  },
+  "statusOff": {
+    "message": "Not enabled yet"
+  },
+  "needsAccess": {
+    "message": "Needs site access"
+  },
+  "allow": {
+    "message": "Allow"
+  },
+  "thisPage": {
+    "message": "This page"
+  },
+  "pause": {
+    "message": "Pause"
+  },
+  "resume": {
+    "message": "Resume"
+  },
+  "backdrop": {
+    "message": "Backdrop"
+  },
+  "backdropDark": {
+    "message": "Dark"
+  },
+  "backdropLight": {
+    "message": "Light"
+  },
+  "backdropChecker": {
+    "message": "Checker"
+  },
+  "popupNote": {
+    "message": "Click any image to see it full size. <strong>Pause</strong> turns Closer off for this site only."
+  },
+
+  "welcomeIntro": {
+    "message": "Click any image to view it full size, in place, at its real dimensions."
+  },
+  "siteAccess": {
+    "message": "Site access"
+  },
+  "allowAll": {
+    "message": "Allow on all sites"
+  },
+  "revokeAll": {
+    "message": "Revoke access"
+  },
+  "welcomeNote": {
+    "message": "Closer needs to see every page to decide which images are worth opening — that's the whole product. It reads nothing else: no page text, no form values, no history, no cookies. No network requests, no analytics. You can revoke this here or from <code>chrome://extensions</code> at any time."
+  },
+  "pausedSites": {
+    "message": "Paused sites"
+  },
+  "welcomeEmpty": {
+    "message": "Nothing paused. When a site has its own viewer or gets in the way, hit <strong>Pause on …</strong> inside the info panel."
+  },
+  "pausedCountOne": {
+    "message": "1 site"
+  },
+  "pausedCountMany": {
+    "message": "$N$ sites",
+    "placeholders": {
+      "n": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+
+  "viewerLabel": {
+    "message": "Image viewer"
+  },
+  "infoLabel": {
+    "message": "Image info"
+  },
+  "infoTitle": {
+    "message": "Image info (I)"
+  },
+  "copyLabel": {
+    "message": "Copy image"
+  },
+  "copyTitle": {
+    "message": "Copy image (⇧ click: copy address)"
+  },
+  "saveLabel": {
+    "message": "Save image"
+  },
+  "saveTitle": {
+    "message": "Save image"
+  },
+  "closeLabel": {
+    "message": "Close"
+  },
+  "closeTitle": {
+    "message": "Close (Esc)"
+  },
+  "shownDims": {
+    "message": "shown $W$ × $H$",
+    "placeholders": {
+      "w": {
+        "content": "$1",
+        "example": "800"
+      },
+      "h": {
+        "content": "$2",
+        "example": "600"
+      }
+    }
+  },
+  "pauseOn": {
+    "message": "Pause on $SITE$",
+    "placeholders": {
+      "site": {
+        "content": "$1",
+        "example": "example.com"
+      }
+    }
+  },
+  "pauseOnThisSite": {
+    "message": "Pause on this site"
+  },
+  "copyTooLarge": {
+    "message": "Too large to copy — address copied"
+  },
+  "copyFailed": {
+    "message": "Copy failed"
+  },
+  "saveFailed": {
+    "message": "Save failed"
+  }
+}

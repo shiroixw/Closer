@@ -1,6 +1,6 @@
 'use strict';
 
-// 命名空间、偏好、暂停列表。
+// 命名空间、文案、偏好、暂停列表。
 // 注意用 var：多个 content script 文件共享同一个全局词法环境，
 // 顶层 const 会在第二个文件里抛「already declared」。
 
@@ -10,6 +10,28 @@ const PAUSED_KEY = 'closer:paused';
 const PREFS_KEY = 'closer:prefs';
 
 const DEFAULT_PREFS = { backdrop: 'dark' };
+
+/* ---------- 文案 ---------- */
+
+// 语言由浏览器 UI 语言决定（manifest 的 default_locale + _locales/*），
+// 这里不解析 navigator.language，也不提供切换开关（宪法第九条：能自动答对的问题不抛给用户）。
+Closer.lang = 'en';
+try {
+  Closer.lang = (chrome.i18n.getUILanguage() || 'en').replace('_', '-');
+} catch {
+  /* 扩展上下文已失效：按 en 显示，不阻塞页面 */
+}
+
+// 漏 key 时 getMessage 返回空串而不报错，所以退回 key 本身：
+// 界面上直接出现 copyFailed 这样的字样，比一片空白更容易被发现。
+// tools/check-i18n.mjs 会在 verify 阶段先把不存在的 key 拦下来。
+Closer.t = function (key, subs) {
+  try {
+    return chrome.i18n.getMessage(key, subs) || key;
+  } catch {
+    return key;
+  }
+};
 
 /* ---------- 站点身份 ---------- */
 

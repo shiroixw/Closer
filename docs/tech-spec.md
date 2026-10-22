@@ -18,7 +18,7 @@ core.js      Closer.host / Closer.state{ready, paused, prefs}
 detect.js    Closer.judge(img) -> boolean            纯函数，无副作用
              Closer.pick(target, x, y) -> img | null  点击对应的是哪张图
 
-yield.js     Closer.snapshot(x, y) -> Baseline
+yield.js     Closer.snapshot(x, y, img) -> Baseline        img 供 skin 判据记基线
              Closer.acted(baseline) -> 命中的判据名 | ''
              Closer.shelled(img) -> boolean          页面是否已经在自己那层里展示它
              Closer.remember(node) -> void           记下页面刚动出来的那一层
@@ -131,17 +131,18 @@ const next = s * Math.exp(-dy * 0.0018);         // 指数，快慢手感一致
 
 ## 4. 让位检测的实现
 
-`design-v0.1.md` 3.2 的四个判据，落地时有三处细节决定成败。
+`design-v0.1.md` 3.2 的五个判据，落地时有五处细节决定成败。
 
 ### 4.1 基线必须在 click 里同步取
 
 ```js
-function snapshot(x, y) {
+function snapshot(x, y, img) {
   return {
     href: location.href,
     fullscreen: document.fullscreenElement,
     scrollLocked: scrollLocked(),
     hit: document.elementFromPoint(x, y),
+    skin: skinChain(img),   // 图自己 + 五层容器的 style/class，见 4.6
     x, y,
   };
 }
@@ -154,6 +155,7 @@ function snapshot(x, y) {
 ```js
 function acted(b) {
   if (location.href !== b.href) return true;                    // 最便宜
+  if (skinChanged(b.skin)) return true;                         // 十几次属性读取，见 4.6
   if (document.fullscreenElement !== b.fullscreen) return true;
   const hit = document.elementFromPoint(b.x, b.y);              // 中等
   if (hit !== b.hit && !isOurs(hit)) return true;
@@ -230,6 +232,48 @@ Closer.shelled = function (img) {
 **不记在站点上。** 「点一次发现页面消费了 → 这个域名以后都不接管」看似更省事，但 `acted()` 命中的原因远不止查看器（点卡片展开、tab 切换、SPA 软导航、慢挂广告）。一次观测去赌整站行为，换来的是不可解释、不可逆的整站失效（D28）。
 
 **记得住的前提是我们看见了那一刻。** 页面加载即开着查看器、用键盘打开、点击后原地放大同一张图（元素身份不变、也没有新层）——这三类记不到，会叠一次，写进 `design §8`。若以后高频，补法是给 `shelled()` 加一个 OR 分支，主结构不动。
+
+### 4.6 就地放大：站点改的是这张图，或它的盒子
+
+Pexels 照片页的放大镜是同一张图的 `transform: scale(3)`，写在 `<img>` 的行内 style 上。它躲过了前四个判据的全部：没有导航、没有全屏、没有滚动锁，`elementFromPoint(x, y)` 依然是**同一个元素**——缩放改变的是它的绘制，不是它的身份。
+
+所以多存一份「这个元素自己的外观」：
+
+```js
+function skinOf(el) {
+  return (el.getAttribute('style') || '') + '\n' + (el.getAttribute('class') || '');
+}
+```
+
+再把范围从 `<img>` 扩到它的盒子——**图自己 + 往上五层，到 body 为止**：
+
+```js
+function skinChain(el) {
+  const out = [{ el, skin: skinOf(el) }];
+  let n = el.parentElement;
+  for (let i = 0; i < 5 && n; i++, n = n.parentElement) {
+    if (n === document.body || n === document.documentElement) break;
+    out.push({ el: n, skin: skinOf(n) });
+  }
+  return out;
+}
+```
+
+往上认，是因为同一个放大镜可以换个写法：class 加在包着图的容器上、CSS 去缩里面的图，图自己的属性一个字都不变。停下是因为 `body` / `html` 的 class 常年被菜单、主题、弹窗改写，那不是这次点击的证据；而真正的放大盒不会离图五层以上。
+
+存的是**元素引用 + 当时的签名**，不是重新走一遍 `parentElement`：页面中途换了包裹层时，按结构重走会得到一条不同的链，白白让位。
+
+**为什么是属性，不是几何。** `getBoundingClientRect()` 看起来更直接，但 `hover` 缩放、`transform` 过渡都是几何变化而不写属性——按几何判，所有带悬停放大的图库都会静默失效。而「点击之后站点改写了这张图自己（或它的盒子）」几乎只出现在「它认领了这次点击」的场合。
+
+**为什么来得及。** 站点是在自己的 `click` 处理器里写 style / class 的，我们的捕获监听在 window 上先跑（取基线），`settle` 在下一帧（读变化），中间隔着一整个事件的传播。真机 Pexels 实测：基线 `transform:none`，下一帧 `scale(3)`，判据命中，overlay 一次都没出现。
+
+**覆盖不到的。**
+- 写在 `body` / `html` 上，或点击 600 ms 之后才写（迟到纠正只看命中点）；
+- 只改 `src` / `srcset` / `data-*`——与懒加载的换图、换状态属性无法区分，故意不收；
+- 只走 `element.animate()` 或内部 JS 状态、不写任何属性——隔离世界观测不到。
+
+这三条都在 `design-v0.1.md` §8 的失败模式表里。按第二条，它们的方向都是「漏开」，可以接受。
+
 
 ---
 
@@ -565,3 +609,24 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 **结论：「复制图片本身」可以做，第 7 节不必重写。** 附带确认了一条流程约束：blob 必须在页面里造，SW 只回传 `ArrayBuffer`——见第 7 节第二条。
 
 三个实验至此全部通过，**可以开始写第一行产品代码**。
+
+---
+
+## 13. 文案与语言（D29）
+
+两种语言：`en`（`default_locale`）与 `zh_CN`。语言由浏览器 UI 语言决定，代码里没有任何检测逻辑，也没有切换开关。
+
+| 位置 | 怎么取 | 为什么 |
+| --- | --- | --- |
+| content（overlay） | `Closer.t(key, subs)` → `chrome.i18n.getMessage` | `chrome.i18n` 是 content script 能直接调的少数 API 之一，同步——不破坏「click → open 只隔一次 rAF」 |
+| popup / welcome | `ui/i18n.js` 的 `t()` + `data-i18n` / `data-i18n-html` | HTML 不支持 `__MSG__`，只能由 JS 填；两个页面共用一份五行包装，不为它引模块系统 |
+| manifest | `__MSG_appName__` / `__MSG_appDesc__` | 平台唯一支持 manifest 本地化的机制；`default_locale` 与 `_locales/` 必须同时存在，缺一边 Chrome 直接装不上 |
+
+四条实现约束：
+
+- **占位符必须声明**在 `placeholders` 里（`"content": "$1"`），不要在 message 里直接写 `$1`。语序不同的语言只能靠占位符对上：`Pause on $SITE$` / `在 $SITE$ 上暂停`。
+- **漏 key 不报错**，`getMessage` 返回空串，界面上一块空白。所以 `Closer.t` 退回 key 本身（看得见 `copyFailed` 这种字），并由 `tools/check-i18n.mjs` 在 `verify` 阶段拦下。
+- **`<strong>` / `<code>` 写在 messages.json 里**，取用时显式 `{ escapeLt: false }`，且只灌进 `data-i18n-html` 的那几段说明文字；其余文案一律 `textContent`。
+- **key 必须写成字面量**：`Closer.t('copyFailed')`，不要 `Closer.t(someVar)`。`check-i18n` 靠静态扫字面量来判断「有没有引用不存在的 key」和「有没有没人引用的 key」，绕过去就等于关掉了这条检查。
+
+`tools/check-i18n.mjs` 的断言：默认语言目录存在 → 各语言 key 集合与默认语言逐字相同 → 同一 key 的占位符跨语言相同 → 代码/manifest 引用的 key 都存在（反向也报未被引用的 key）。它不需要浏览器，所以能进 `verify`。

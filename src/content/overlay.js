@@ -103,7 +103,8 @@ button:hover{background:rgba(63,63,70,.9)}
     // 不写 aria-modal：模态语义要求焦点进入对话框，而第三条禁止抢焦点
     // （页面能观测到 blur 的地方，视频会暂停、编辑器会失焦）。
     // 撒谎的 ARIA 比没有 ARIA 更糟，所以这里退成非模态 dialog。
-    host.setAttribute('aria-label', 'Image viewer');
+    host.setAttribute('aria-label', Closer.t('viewerLabel'));
+    host.lang = Closer.lang; // 中文标签要按中文读，不能跟着页面语言走
     host.tabIndex = -1; // 不 focus：键位靠 window capture，不需要焦点（6.7）
 
     shadow = host.attachShadow({ mode: 'open' });
@@ -118,11 +119,11 @@ button:hover{background:rgba(63,63,70,.9)}
         <img class="photo" alt="" draggable="false">
       </div>
       <div class="bar">
-        <button class="info" aria-label="Image info" title="Image info (I)" aria-expanded="false">i</button>
+        <button class="info" aria-expanded="false">i</button>
         <div class="actions">
-          <button class="act copy" aria-label="Copy image" title="Copy image (⇧ click: copy address)">${COPY_SVG}</button>
-          <button class="act save" aria-label="Save image" title="Save image">${SAVE_SVG}</button>
-          <button class="act close" aria-label="Close" title="Close (Esc)">${CLOSE_SVG}</button>
+          <button class="act copy">${COPY_SVG}</button>
+          <button class="act save">${SAVE_SVG}</button>
+          <button class="act close">${CLOSE_SVG}</button>
         </div>
       </div>
       <div class="panel" hidden>
@@ -151,6 +152,17 @@ button:hover{background:rgba(63,63,70,.9)}
     rRatio = shadow.querySelector('.ratio');
     rSize = shadow.querySelector('.size');
     pauseBtn = shadow.querySelector('.pause');
+
+    // 读屏标签与 tooltip：文案只从语言包来，模板里只留结构。
+    // 每个 key 都写成字面量，不经过变量——tools/check-i18n.mjs 靠这个静态扫出漏 key。
+    infoBtn.setAttribute('aria-label', Closer.t('infoLabel'));
+    infoBtn.title = Closer.t('infoTitle');
+    copyBtn.setAttribute('aria-label', Closer.t('copyLabel'));
+    copyBtn.title = Closer.t('copyTitle');
+    saveBtn.setAttribute('aria-label', Closer.t('saveLabel'));
+    saveBtn.title = Closer.t('saveTitle');
+    closeBtn.setAttribute('aria-label', Closer.t('closeLabel'));
+    closeBtn.title = Closer.t('closeTitle');
 
     infoBtn.addEventListener('click', () => togglePanel());
     closeBtn.addEventListener('click', () => close());
@@ -213,7 +225,7 @@ button:hover{background:rgba(63,63,70,.9)}
 
     const scaled = m.sw && (Math.abs(m.sw - m.nw) > 1 || Math.abs(m.sh - m.nh) > 1);
     rShown.hidden = !scaled;
-    if (scaled) rShown.textContent = `shown ${m.sw} × ${m.sh}`;
+    if (scaled) rShown.textContent = Closer.t('shownDims', [String(m.sw), String(m.sh)]);
 
     rRatio.textContent = [m.ratio, m.mp ? `${m.mp} MP` : ''].filter(Boolean).join(' · ');
 
@@ -223,7 +235,9 @@ button:hover{background:rgba(63,63,70,.9)}
     rSize.hidden = !head;
     rSize.textContent = head;
 
-    pauseBtn.textContent = `Pause on ${Closer.site() || 'this site'}`;
+    // 占位符而不是字符串拼接：中文的语序是「在 x 上暂停」，拼接会拼出英文语序
+    const site = Closer.site();
+    pauseBtn.textContent = site ? Closer.t('pauseOn', [site]) : Closer.t('pauseOnThisSite');
   }
 
   function togglePanel(force) {
@@ -265,12 +279,12 @@ button:hover{background:rgba(63,63,70,.9)}
         if (!got?.buf) throw new Error('bytes');
         // 太大时降级成地址：拿到的东西变了，就得说出来（5.4）
         if ((await Closer.copyImage(got, m.url)) === 'address') {
-          say('Too large to copy — address copied');
+          say(Closer.t('copyTooLarge'));
         }
       }
       flash(copyBtn);
     } catch {
-      say('Copy failed');
+      say(Closer.t('copyFailed'));
     }
   }
 
@@ -283,7 +297,7 @@ button:hover{background:rgba(63,63,70,.9)}
       await Closer.saveImage(got, Closer.fileName(m.url, m));
       flash(saveBtn);
     } catch {
-      say('Save failed');
+      say(Closer.t('saveFailed'));
     }
   }
 
