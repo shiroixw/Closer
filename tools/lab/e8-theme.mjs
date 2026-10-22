@@ -257,6 +257,9 @@ const inspect = () =>
 const report = [];
 const check = (name, ok, detail) => report.push({ name, ok: !!ok, detail });
 
+// 「浅色」是半透明浅黑，不是白：纯白背板在暗环境里刺眼，也把页面整个埋掉
+const LIGHT_BG = 'rgba(24, 24, 27, 0.55)';
+
 const THEMES = (process.env.ONLY || 'dark,light,checker').split(',');
 for (const want of THEMES) {
   await setPrefs({ backdrop: want });
@@ -285,7 +288,7 @@ for (const want of THEMES) {
     continue;
   }
 
-  const expect = { dark: 'rgb(11, 11, 12)', light: 'rgb(244, 244, 245)', checker: 'rgb(255, 255, 255)' }[want];
+  const expect = { dark: 'rgb(11, 11, 12)', light: LIGHT_BG, checker: 'rgb(255, 255, 255)' }[want];
   check(`${want}: host 类名`, st.hostClass === want, `class="${st.hostClass}"`);
   check(`${want}: 背板底色`, st.bg === expect, `实际 ${st.bg}，期望 ${expect}`);
   check(`${want}: 背板铺满`, st.rect[0] === (await evaluate('innerWidth')) && st.rect[1] === (await evaluate('innerHeight')), `${st.rect}`);
@@ -315,7 +318,7 @@ if (spot) {
   await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'b', code: 'KeyB', windowsVirtualKeyCode: 66, nativeVirtualKeyCode: 66 });
   await sleep(250);
   const after = await inspect();
-  check('B 键：dark → light', after?.bg === 'rgb(244, 244, 245)', `${before?.bg} → ${after?.bg}`);
+  check('B 键：dark → light', after?.bg === LIGHT_BG, `${before?.bg} → ${after?.bg}`);
 }
 
 page.ws.close();
