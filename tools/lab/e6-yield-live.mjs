@@ -111,6 +111,7 @@ function viewer() {
   const d = document.createElement('div');
   d.className = 'lightbox';
   const im = document.createElement('img');
+  im.id = 'big';
   im.src = '/photo.png';
   d.appendChild(im);
   document.body.appendChild(d);
@@ -296,6 +297,12 @@ const syncTheirs = await hasLightbox();
 check('S1 站点自己的查看器开了', syncTheirs === true);
 check('S2 我们让位，没有叠加', syncOurs === false);
 
+// 第二次点击：点在站点查看器里的图上。
+// 这一刻四项判据全部沉默（页面早就动手完了），只能靠「上一次接管的那一层」兜住。
+await clickImage('big');
+await sleep(600);
+check('S3 查看器里再点一次：仍然不接管（cases 006）', (await has()) === false);
+
 /* --- late --- */
 
 await reload();
@@ -309,6 +316,11 @@ const lateTheirs = await hasLightbox();
 check('L1 页面还没动手时我们先打开', lateEarly === true);
 check('L2 站点慢挂查看器后，我们自己关掉', lateAfter === false);
 check('L3 站点查看器保留', lateTheirs === true);
+
+// 慢半拍接管也是接管：这时候再点它，同样不该叠加
+await clickImage('big');
+await sleep(600);
+check('L4 慢挂的查看器里再点一次：不接管', (await has()) === false);
 
 /* --- card：图片被声明成可点区域 --- */
 

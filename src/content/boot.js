@@ -70,9 +70,15 @@ var Closer = (window.Closer ||= {});
     }
 
     const target = e.composedPath()[0];
-    const img = target instanceof Element ? target.closest('img') : null;
+    // 图片上面盖了一层透明装饰时，target 与图无关，得按命中点找回来
+    const img = Closer.pick(target, e.clientX, e.clientY);
     if (!img || !Closer.judge(img)) return;
 
+    // 页面已经在自己开的那一层里展示它了：再开一层只是两套遮罩（case 006）。
+    // 这条路径一个字节都不改——不拦默认行为，站点自己的放大缩小照常。
+    if (Closer.shelled(img)) return;
+
+    // 第三参 img 供 skin 判据记基线（case 007：站点就地放大，元素身份不变）
     const base = Closer.snapshot(e.clientX, e.clientY, img);
     e.preventDefault(); // 只掐默认行为，不阻断传播：页面自己的处理器照常跑
 

@@ -374,7 +374,7 @@ if (st) {
     sizeText = (await overlayState())?.size || '';
   }
   check('C5 面板体积行最终有数字', /\d\s?(B|KB|MB)$/.test(sizeText.trim()), `${sizeText || '（空）'} · 等 ${waited} ms`);
-  // 文案跟着浏览器语言走（D28），所以判据是「站点名出现在按钮上」，而不是某个英文原句
+  // 文案跟着浏览器语言走（D29），所以判据是「站点名出现在按钮上」，而不是某个英文原句
   check('C4 面板里的暂停按钮认得出当前站点', /127\.0\.0\.1/.test(panelState.pause || ''), panelState.pause);
 
   await evaluate("document.getElementById('closer').shadowRoot.querySelector('.info').click()");

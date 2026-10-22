@@ -85,10 +85,18 @@ const PAGE = `<!doctype html>
   #avatar{width:40px;height:40px;display:block;margin-bottom:20px}
   a#link{display:block;width:240px}
   a#link img{width:240px}
+  /* 图库常见形态：图上盖一层透明的悬停装饰，点击落在装饰上 */
+  #frame{position:relative;width:240px}
+  #frame img{width:240px;display:block}
+  #shade{position:absolute;inset:0}
+  /* 同一形态换成 Web Component 实现：命中栈里只剩 host */
+  #shadow-frame{display:block;width:240px}
 </style>
 <img id="big" src="/img.png">
 <img id="avatar" src="/avatar.png">
 <a id="link" href="/article"><img id="linked" src="/img.png"></a>
+<div id="frame"><img id="covered" src="/img.png"><div id="shade"></div></div>
+<div id="shadow-frame"></div>
 <script>
 window.chrome = {
   storage: {
@@ -104,6 +112,21 @@ window.chrome = {
   },
 };
 window.__snap = null;
+
+// 同一形态的 Web Component 版：图与遮罩都在 shadow tree 里，外部只看得见 host
+(() => {
+  const sr = document.getElementById('shadow-frame').attachShadow({ mode: 'open' });
+  sr.innerHTML = '<style>.f{position:relative;width:240px}img{display:block;width:240px}.s{position:absolute;inset:0}</style>';
+  const frame = document.createElement('div');
+  frame.className = 'f';
+  const img = document.createElement('img');
+  img.src = '/img.png';
+  const shade = document.createElement('div');
+  shade.className = 's';
+  shade.id = 'shadow-shade';
+  frame.append(img, shade);
+  sr.append(frame);
+})();
 </script>
 <script src="/js/core.js"></script>
 <script src="/js/detect.js"></script>
@@ -331,6 +354,72 @@ if (!ready) {
   await sleep(200);
   const linkOpen = await evalx(`!!document.getElementById('closer')`);
   check('文章链接里的图不接管', linked.value === false && linkOpen.value === false);
+
+  // 6. 透明装饰盖着图：点击落在装饰上，仍要认出下面那张图（真实站点 cases 004）
+  const picked = await evalx(`(() => {
+    const shade = document.getElementById('shade');
+    shade.scrollIntoView({ block: 'center' }); // 视口外的点，elementsFromPoint 返回空
+    const r = shade.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const img = Closer.pick(shade, x, y);
+    shade.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y,
+    }));
+    return {
+      shadeRect: [Math.round(r.width), Math.round(r.height)],
+      stack: document.elementsFromPoint(x, y).map((n) => n.tagName + (n.id ? '#' + n.id : '')),
+      pick: img && img.id,
+      judge: img ? Closer.judge(img) : null,
+    };
+  })()`);
+  await sleep(360);
+  const covered = await evalx(`(() => {
+    const h = document.getElementById('closer');
+    if (!h) return { open: false };
+    return { open: Closer.overlay.isOpen(), src: (h.shadowRoot.querySelector('.photo').src || '').endsWith('/img.png') };
+  })()`);
+  const c = covered.value || {};
+  check(
+    '透明遮罩盖着的图，点遮罩也能打开',
+    c.open === true && c.src === true,
+    `${JSON.stringify(picked.value)} ${JSON.stringify(c)}`
+  );
+
+  await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(480);
+
+  // 7. 同一形态的 Web Component 版：图与遮罩都在 shadow tree 里。
+  //    elementFromPoint 只返回 host，必须下钻才看得见那张图。
+  const inner = await evalx(`(() => {
+    const host = document.getElementById('shadow-frame');
+    const shade = host.shadowRoot.getElementById('shadow-shade');
+    host.scrollIntoView({ block: 'center' });
+    const r = shade.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const img = Closer.pick(shade, x, y);
+    shade.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, composed: true, cancelable: true, button: 0, clientX: x, clientY: y,
+    }));
+    return {
+      stack: document.elementsFromPoint(x, y).map((n) => n.tagName + (n.id ? '#' + n.id : '')),
+      pick: img ? img.tagName : null,
+      judge: img ? Closer.judge(img) : null,
+    };
+  })()`);
+  await sleep(360);
+  const shadowOpen = await evalx(`(() => {
+    const h = document.getElementById('closer');
+    if (!h) return { open: false };
+    return { open: Closer.overlay.isOpen(), src: (h.shadowRoot.querySelector('.photo').src || '').endsWith('/img.png') };
+  })()`);
+  const s = shadowOpen.value || {};
+  check(
+    'shadow tree 里的遮罩：下钻后也能打开',
+    s.open === true && s.src === true,
+    `${JSON.stringify(inner.value)} ${JSON.stringify(s)}`
+  );
 }
 
 ws.close();

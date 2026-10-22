@@ -74,6 +74,70 @@ Closer.judge = function (img) {
 };
 
 /**
+ * 这一下点的是哪张图。
+ *
+ * 多数时候 target 就在图里，closest 一次就够；但图上方常盖着一层透明装饰
+ * （图库的致谢遮罩、卡片的悬停层），点击落在装饰上，target 与图毫无关系。
+ * 光看事件目标，这整类站点会表现为「点了没反应」，而页面自己什么也没做。
+ * 那种情况只能用命中点栈把图找回来。
+ *
+ * 三条边界：
+ *   1. 点中的东西自己在做事（链接、控件）就不接管——那是页面的意图，不是看这张图。
+ *   2. 图必须和点击落在同一块地方：往上找共同祖先，body / html 不算；
+ *      否则点浮层、点页头会把下面任意一张图拽出来。
+ *   3. 命中栈不穿 shadow，图被做进 Web Component 时要逐层下钻（见 fromPoint）。
+ */
+Closer.pick = function (target, x, y) {
+  if (!(target instanceof Element)) return null;
+
+  const inside = target.closest('img');
+  if (inside) return inside;
+
+  if (target.closest('a,' + CONTROL)) return null;
+
+  return fromPoint(target, x, y);
+};
+
+/**
+ * 命中点上的图。
+ *
+ * elementFromPoint 不穿 shadow：站点把「图 + 遮罩」做进 Web Component 时，
+ * 命中栈里只有 host。所以栈顶若是带 shadowRoot 的宿主，就下钻一层再看——
+ * 最多三层，再深的组件套组件不值得为它付复杂度。
+ * 下钻不需要额外的信任判断：图仍要过 sameFrame()，隔着组件猜的图会被挡掉。
+ */
+function fromPoint(target, x, y) {
+  const MAX = 3;
+  let scope = document;
+
+  for (let depth = 0; depth < MAX; depth++) {
+    let stack;
+    try {
+      stack = scope.elementsFromPoint(x, y);
+    } catch {
+      return null;
+    }
+
+    let inner = null;
+    for (const node of stack) {
+      if (node instanceof HTMLImageElement && sameFrame(target, node)) return node;
+      if (!inner && node.shadowRoot) inner = node.shadowRoot;
+    }
+    if (!inner) return null;
+    scope = inner;
+  }
+  return null;
+}
+
+// 共同祖先要有边界：body 包含一切，认它就等于认「页面上的图都算」。
+function sameFrame(from, img) {
+  for (let n = from; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+    if (n.contains(img)) return true;
+  }
+  return false;
+}
+
+/**
  * 找「声明了 cursor:pointer 的那层容器」，找不到返回 null。
  *
  * 为什么要它：H5 活动页把整张卡片做成 <section> + JS 事件委托，
