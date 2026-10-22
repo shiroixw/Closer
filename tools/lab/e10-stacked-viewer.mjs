@@ -155,7 +155,13 @@ function openSiblingViewer() {
 document.getElementById('static').addEventListener('click', () => { openViewer(); });
 document.getElementById('zoom').addEventListener('click', () => { zoomOn(openViewer(), 1.4); });
 document.getElementById('zoomout').addEventListener('click', () => { zoomOn(openViewer(), 0.35); });
-document.getElementById('sib').addEventListener('click', () => { openSiblingViewer(); });
+document.getElementById('sib').addEventListener('click', () => {
+  // 知乎打开查看器时会把被点的缩略图设成 visibility:hidden。于是第一次放大走的是
+  // skin 判据（不是 hit），而 skin 那条分支没有层可记 —— 桩页必须复刻这一点，
+  // 否则 B2 测不出「skin 不落账」那个缺口，只会在真机上第一次缩小才翻车。
+  document.getElementById('sib').style.visibility = 'hidden';
+  openSiblingViewer();
+});
 </script>`;
 
 // app 外壳：整站内容躺在一个 fixed 全屏容器里，图只是里面一个小缩略图。

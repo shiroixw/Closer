@@ -93,7 +93,14 @@ Closer.snapshot = function (x, y, img) {
 Closer.acted = function (b) {
   if (location.href !== b.href) return 'href';
   // 站点就地放大的形态：元素没换、位置没动，只有它自己（或它的盒子）被改写了。
-  if (b.skin && skinChanged(b.skin)) return 'skin';
+  if (b.skin && skinChanged(b.skin)) {
+    // 这条分支没有「多出来的那一层」可记，但「页面接管过」这件事成立。
+    // 漏掉这一句的代价是具体的：知乎在打开查看器时把被点的缩略图设成
+    // visibility:hidden，于是第一次放大走的是 skin、而不是 hit，`remember()`
+    // 一次都不跑 → 紧接着的**第一次**缩小仍然会叠一层（真机 1/3，cases 009）。
+    Closer.state.yielded = true;
+    return 'skin';
+  }
   if (!!document.fullscreenElement !== b.fs) return 'fullscreen';
 
   const now = document.elementFromPoint(b.x, b.y);
