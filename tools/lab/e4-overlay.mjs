@@ -89,6 +89,8 @@ const PAGE = `<!doctype html>
   #frame{position:relative;width:240px}
   #frame img{width:240px;display:block}
   #shade{position:absolute;inset:0}
+  /* 页面自己声明了手势的图：悬停提示必须让开（D32） */
+  #own{width:240px;display:block;margin-bottom:20px;cursor:zoom-in}
   /* 同一形态换成 Web Component 实现：命中栈里只剩 host */
   #shadow-frame{display:block;width:240px}
 </style>
@@ -96,6 +98,7 @@ const PAGE = `<!doctype html>
 <img id="avatar" src="/avatar.png">
 <a id="link" href="/article"><img id="linked" src="/img.png"></a>
 <div id="frame"><img id="covered" src="/img.png"><div id="shade"></div></div>
+<img id="own" src="/img.png">
 <div id="shadow-frame"></div>
 <script>
 window.chrome = {
@@ -135,6 +138,7 @@ window.__snap = null;
 <script src="/js/yield.js"></script>
 <script src="/js/overlay.js"></script>
 <script src="/js/actions.js"></script>
+<script src="/js/hint.js"></script>
 <script src="/js/boot.js"></script>
 <script>
 (async () => {
@@ -326,6 +330,40 @@ if (!ready) {
   })`);
   check('Esc 关闭后 host 已摘除', closed.value?.gone === true);
   check('关闭后页面 DOM 逐字节一致', closed.value?.intact === true);
+
+  // 3b. 悬停提示：只在「真能点开」的图上给原生 zoom-in（D32）。
+  //     用合成 PointerEvent 而不是 CDP 鼠标：判据只看 target 与 judge()，
+  //     不需要真的命中测试，也就不必把元素滚进视口。
+  const hover = (id) =>
+    evalx(`(() => {
+      document.getElementById('${id}').dispatchEvent(
+        new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' })
+      );
+      return true;
+    })()`);
+
+  await hover('big');
+  await sleep(220); // 越过 DWELL(140) 再读
+  const hintOn = await evalx(`document.getElementById('big').style.cursor`);
+  check('悬停能打开的图 → 原生 zoom-in', hintOn.value === 'zoom-in', String(hintOn.value));
+
+  await hover('own');
+  await sleep(220);
+  const hintOff = await evalx(`({
+    cursor: document.getElementById('big').style.cursor,
+    attr: document.getElementById('big').hasAttribute('style'),
+    own: document.getElementById('own').style.cursor,
+    intact: document.documentElement.outerHTML === window.__snap,
+  })`);
+  const h = hintOff.value || {};
+  check('离开后光标还原，且不留 style 属性', h.cursor === '' && h.attr === false, JSON.stringify(h));
+  check('页面自己声明了 cursor 的图不碰', h.own === '', `own.style.cursor=${h.own}`);
+  check('提示撤销后 DOM 仍逐字节一致', h.intact === true);
+
+  await hover('avatar');
+  await sleep(220);
+  const hintAvatar = await evalx(`document.getElementById('avatar').style.cursor`);
+  check('判不过的图（40px 头像）不给手势', hintAvatar.value === '', String(hintAvatar.value));
 
   // 4. 头像不接管
   const avatar = await evalx(`(() => {

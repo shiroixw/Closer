@@ -16,6 +16,7 @@ const FILES = [
   'src/content/bytes.js',
   'src/content/overlay.js',
   'src/content/actions.js',
+  'src/content/hint.js',
   'src/content/boot.js',
 ];
 

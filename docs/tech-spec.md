@@ -35,6 +35,9 @@ overlay.js   Closer.overlay.open(img, media) / close() / isOpen()
 actions.js   Closer.copyImage({buf, mime}) -> Promise<void>
              Closer.saveImage({buf, mime}, name) -> Promise<void>
 
+hint.js      Closer.hint.attach() / reset()
+             悬停提示：判得开的那张图给原生 zoom-in，离开即还原（D32）
+
 boot.js      接线。唯一允许调用上面所有东西的地方。
 ```
 
@@ -43,6 +46,8 @@ boot.js      接线。唯一允许调用上面所有东西的地方。
 `pick()` 是 `judge()` 的前一步。图上方常盖着一层透明装饰（图库的致谢遮罩、卡片的悬停层），点击落在装饰上，`target.closest('img')` 什么也找不到——只看事件目标，这整类站点表现为「点了没反应」。所以 target 不是图时用 `elementsFromPoint` 把图找回来，三条边界：装饰本身是链接/控件就放行（那是页面的意图）；图必须与点击共享一个**非 body** 的祖先，否则点浮层、点页头会把下面任意一张图拽出来（`cases.md` 004）；命中栈顶是带 `shadowRoot` 的宿主时下钻（`ShadowRoot.elementsFromPoint`），最多 3 层——`elementFromPoint` 不穿 shadow，站点把图与遮罩做进 Web Component 时只有下钻才看得见（`cases.md` 005）。`sameFrame()` 是下钻的唯一信任来源，隔着组件猜出来的图会被它挡掉。
 
 `bytes.js` 是 `design-v0.1.md` 第 6 节文件表里后来补上的一项：取字节被 `meta`（要大小）、`actions`（要内容）和 `overlay`（显示）三方需要，抽出来才能只请求一次。
+
+`hint.js` 是收尾时补的第三个消费方：它不判断，只把 `judge()` 的结论翻译成浏览器原生手势。三条约束写死在实现里：① 只在 `judge()` 通过、`shelled()` 为假、站点未暂停、overlay 未打开时写；② 页面自己的手势优先——`getComputedStyle(img).cursor !== 'auto'` 一律不碰；③ **`boot` 必须在 `snapshot()` 之前调 `reset()`**：`skin` 判据读的是 `style` 属性，我们的撤销若跨过那次基线，页面明明没动也会被判成「认领了这次点击」（一个会被误判成让位的自伤）。悬停用 `pointerover` 而不是 `pointermove`：前者只在目标元素变化时触发，定位也只算一次，不必按帧跟随。
 
 ---
 
@@ -439,8 +444,11 @@ pointercancel → 复位，不关闭
 | --- | --- | --- |
 | 背板 | `zoom-out` | 点这里会关掉 |
 | 图片 | `grab` / 拖拽时 `grabbing` | 这是被看的东西，点它不关 |
+| 页面上的图（页面自己没声明 cursor） | `zoom-in`（悬停 140 ms 后才写） | 这张图点下去会打开（`judge()` 通过），D32 |
 
 用背板的 `zoom-out` 而不是整屏统一，是因为「点图不关闭」和「点空白关闭」必须能被光标区分开，否则用户永远猜不到。
+
+overlay **之外**的那一行是唯一一处我们写页面元素的地方，所以它被三条闸夹着：判得开才写、页面声明过的 cursor 一律让、`snapshot()` 之前必须撤销。别把它改成常驻样式表——`cursor` 是继承属性，CSS 层面的「低优先级」会打断页面的继承，进而让 D24 那类可点卡片上的手型变成放大镜（D32 的理由栏）。
 
 ---
 
@@ -523,10 +531,10 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 
 | 预算 | 测法 |
 | --- | --- |
-| < 60 KB | `wc -c src/content/*.js \| tail -1`，或直接看 `tools/check-manifest.mjs` 的告警行 |
+| < 64 KB | `wc -c src/content/*.js \| tail -1`，或直接看 `tools/check-manifest.mjs` 的告警行 |
 | `judge()` < 1 ms | 开发时在控制台对同一张图跑 1000 次取平均；**不写进发布代码** |
 | 点击 → 首帧 < 100 ms | 同上，`performance.mark` 两次；只在本地验 |
-| 加载期 2 个监听 | 数 `addEventListener`，跑测试时在 `chrome://extensions` 检查 |
+| 加载期 3 个监听 | `e7` 数 `boot.js` + `hint.js` 的 `addEventListener`（D32 后由 2 改成 3） |
 
 测量代码不进仓库的发布路径——第六条管的是发布产物。
 

@@ -104,6 +104,7 @@ ${STUB}
 <script src="/js/yield.js"></script>
 <script src="/js/overlay.js"></script>
 <script src="/js/actions.js"></script>
+<script src="/js/hint.js"></script>
 <script src="/js/boot.js"></script>
 <script>
 (async () => {
@@ -226,6 +227,29 @@ const spot = await ev(`(() => {
 })()`);
 
 await sleep(120);
+
+/* --- 3a. 悬停提示用**真实鼠标**验一次（D32） ---
+   e4 用合成 PointerEvent 验判据逻辑，这里补的是「浏览器真的会派 pointerover、
+   光标真的黏得住又放得掉」，两者缺一都不算测过。 */
+await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: spot.x, y: spot.y, button: 'none' });
+await sleep(60);
+const early = await ev(`document.getElementById('big').style.cursor`);
+await sleep(220); // 越过 DWELL(140)
+const dwelled = await ev(`document.getElementById('big').style.cursor`);
+await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 4, y: 4, button: 'none' });
+await sleep(100);
+const left = await ev(`({
+  cursor: document.getElementById('big').style.cursor,
+  attr: document.getElementById('big').hasAttribute('style'),
+})`);
+check(
+  '悬停提示：140 ms 前不动、之后给 zoom-in、移开即还原',
+  early === '' && dwelled === 'zoom-in' && left.cursor === '' && left.attr === false,
+  `60ms=${JSON.stringify(early)} 280ms=${JSON.stringify(dwelled)} 离开=${JSON.stringify(left)}`
+);
+
+await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: spot.x, y: spot.y, button: 'none' });
+await sleep(120);
 await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: spot.x, y: spot.y, button: 'left', clickCount: 1 });
 await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: spot.x, y: spot.y, button: 'left', clickCount: 1 });
 
@@ -248,9 +272,18 @@ check('点击确实打开了 overlay', (await ev("!!document.getElementById('clo
 
 /* --- 4. 加载期的监听器（静态） --- */
 
+// 加载期的监听分布在两个文件：boot 的接线，和 hint 的 pointerover（D32）。
+// 只数 boot.js 会漏掉后者——预算数字必须跟着代码走，否则条子在说谎。
 const bootSrc = fs.readFileSync(path.join(ROOT, 'src/content/boot.js'), 'utf8');
-const topLevelAdds = (bootSrc.match(/^\s*addEventListener\(/gm) || []).length;
-check('页面加载期只挂 ≤ 2 个监听', topLevelAdds <= 2, `boot.js 顶层 addEventListener × ${topLevelAdds}`);
+const hintSrc = fs.readFileSync(path.join(ROOT, 'src/content/hint.js'), 'utf8');
+const addsOf = (src) => (src.match(/^\s*addEventListener\(/gm) || []).length;
+const bootAdds = addsOf(bootSrc);
+const hintAdds = addsOf(hintSrc);
+check(
+  '页面加载期只挂 ≤ 3 个监听',
+  bootAdds + hintAdds <= 3,
+  `boot.js × ${bootAdds} + hint.js × ${hintAdds}（宪法第六条，D32）`
+);
 
 // overlay 打开时才挂的那一批，不该算进加载预算
 const overlaySrc = fs.readFileSync(path.join(ROOT, 'src/content/overlay.js'), 'utf8');

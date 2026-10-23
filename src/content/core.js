@@ -143,6 +143,8 @@ try {
       const site = Closer.site();
       Closer.state.paused = Array.isArray(list) && list.some((entry) => covers(entry, site));
       if (Closer.state.paused && Closer.overlay?.isOpen?.()) Closer.overlay.close();
+      // 暂停要立刻生效，连悬停出来的光标一起收（D32）
+      if (Closer.state.paused) Closer.hint?.reset?.();
     }
 
     if (changes[PREFS_KEY] && changes[PREFS_KEY].newValue) {
