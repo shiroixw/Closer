@@ -342,13 +342,11 @@ if (!ready) {
       return true;
     })()`);
 
-  await hover('big');
-  await sleep(220); // 越过 DWELL(140) 再读
+  await hover('big'); // 没有 dwell：下一次求值时它已经写好了
   const hintOn = await evalx(`document.getElementById('big').style.cursor`);
-  check('悬停能打开的图 → 原生 zoom-in', hintOn.value === 'zoom-in', String(hintOn.value));
+  check('悬停即给原生 zoom-in（无延时）', hintOn.value === 'zoom-in', String(hintOn.value));
 
   await hover('own');
-  await sleep(220);
   const hintOff = await evalx(`({
     cursor: document.getElementById('big').style.cursor,
     attr: document.getElementById('big').hasAttribute('style'),
@@ -361,7 +359,6 @@ if (!ready) {
   check('提示撤销后 DOM 仍逐字节一致', h.intact === true);
 
   await hover('avatar');
-  await sleep(220);
   const hintAvatar = await evalx(`document.getElementById('avatar').style.cursor`);
   check('判不过的图（40px 头像）不给手势', hintAvatar.value === '', String(hintAvatar.value));
 
