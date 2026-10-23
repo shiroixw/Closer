@@ -73,9 +73,9 @@ for (const p of manifest.optional_host_permissions ?? []) {
   if (p !== '*://*/*') warnings.push(`optional_host_permissions 含非常规值：${p}`);
 }
 
-// ── 3. 体积预算（宪法第六条：content 侧 ≤ 64 KB 未压缩）──
-// 60 → 64 KB 是 2026-10-23 与「监听 2 → 3」同一条修正案里改的，见 D32。
-const BUDGET = 64 * 1024;
+// ── 3. 体积预算（宪法第六条：content 侧 ≤ 66 KB 未压缩）──
+// 60 → 64 → 66 KB 是 2026-10-23 的两次修正，见 D32 与 STATUS 第十一轮（真机配色修复）。
+const BUDGET = 66 * 1024;
 let contentBytes = 0;
 const walk = (dir) => {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -87,8 +87,8 @@ const walk = (dir) => {
 if (existsSync(join(ROOT, 'src/content'))) walk(join(ROOT, 'src/content'));
 if (contentBytes > 0) {
   const kb = (contentBytes / 1024).toFixed(1);
-  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 64 KB 预算（宪法第六条）`);
-  else warnings.push(`content 侧源码 ${kb} KB / 64 KB 预算`);
+  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 66 KB 预算（宪法第六条）`);
+  else warnings.push(`content 侧源码 ${kb} KB / 66 KB 预算`);
 }
 
 // ── 4. 每个发布文件都必须能解析 ──────────────────────────

@@ -91,6 +91,9 @@ const PAGE = `<!doctype html>
   #shade{position:absolute;inset:0}
   /* 页面自己声明了手势的图：悬停提示必须让开（D32） */
   #own{width:240px;display:block;margin-bottom:20px;cursor:zoom-in}
+  /* 2026-10-23 的真实事故复刻：页面对 div 声明颜色与宽度，会盖掉 :host 里的东西
+     （外层树的普通声明优先于 shadow 树的 :host 声明）。宿主必须靠 inline 顶住。 */
+  div{color:#111;max-width:300px;margin:0 auto}
   /* 同一形态换成 Web Component 实现：命中栈里只剩 host */
   #shadow-frame{display:block;width:240px}
 </style>
@@ -268,6 +271,11 @@ if (!ready) {
       backdrop: h.shadowRoot.querySelector('.backdrop').classList.contains('in'),
       bg: getComputedStyle(h.shadowRoot.querySelector('.backdrop')).backgroundColor,
       dims: h.shadowRoot.querySelector('.dims').textContent,
+      // 页面 div{color:#111} 不能把宿主的调色板劫走（2026-10-23 事故）
+      chromeColor: getComputedStyle(h.shadowRoot.querySelector('.info')).color,
+      dimsColor: getComputedStyle(h.shadowRoot.querySelector('.dims')).color,
+      hostPos: getComputedStyle(h).position,
+      hostFull: Math.round(h.getBoundingClientRect().width) === Math.round(innerWidth),
     };
   })()`);
 
@@ -284,6 +292,10 @@ if (!ready) {
   // 只查 opacity 会漏掉「类名挂错节点、背板其实是透明的」——页面会直接透出来
   check('背板不透明（页面不透出）', /^rgb/.test(o.bg || '') && o.bg !== 'rgba(0, 0, 0, 0)', o.bg);
   check('信息面板显示 600 × 400', o.dims === '600 × 400', o.dims);
+  // 页面有 div{color:#111}：只靠 :host 声明会被外层树的普通声明盖掉（真实事故）
+  check('图标文字不被页面 div{color} 劫持', o.chromeColor === 'rgb(245, 245, 245)', o.chromeColor);
+  check('ⓘ 面板数字同样不被劫持', o.dimsColor === 'rgb(245, 245, 245)', o.dimsColor);
+  check('宿主仍是全屏 fixed（页面规则没压窄它）', o.hostPos === 'fixed' && o.hostFull === true, `pos=${o.hostPos} full=${o.hostFull}`);
 
   // 截图（可选）：视觉错位只有看图才知道，断言看不出来
   if (process.env.SHOT) {

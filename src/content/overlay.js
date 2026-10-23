@@ -32,8 +32,9 @@ Closer.overlay = (function () {
   let token = 0; // 晚到的体积探测不许覆盖新图
 
   const CSS = `
-:host{all:initial;position:fixed;inset:0;z-index:2147483647;overflow:hidden;contain:layout style;
-  font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif;color:#f5f5f5}
+/* 宿主自己的定位与调色板**不在这里**，在 ensure() 的 inline style 里。
+   原因：外层树的普通声明优先于 shadow 树的 :host 声明，页面一句 div{color:#111}
+   就能把整条 :host{...} 盖掉（2026-10-23 的真实事故，见 ensure() 的注释）。 */
 [hidden]{display:none!important}
 .backdrop{position:absolute;inset:0;opacity:0;transition:opacity ${ms(260)}ms ease;cursor:zoom-out}
 .backdrop.in{opacity:1}
@@ -81,6 +82,17 @@ button:hover{background:rgba(63,63,70,.9)}
 .panel .pause{display:block;width:100%;text-align:left;font-size:12px;color:#a1a1aa;
   padding:2px 0;background:none;backdrop-filter:none}
 .panel .pause:hover{color:#f5f5f5;background:none}
+/* 面板要跟着「浅」这一档走：按钮都翻成白底深字了，读数卡片还是黑的，
+   同一次操作里就是两套语言（用户第一眼就发现了）。
+   棋盘档**不跟**：白卡压在白格上没有边，而那一档的全部意义就是看清透明图的边界。 */
+:host(.light) .panel{background:rgba(255,255,255,.92);color:#18181b;
+  box-shadow:0 12px 32px rgba(0,0,0,.18)}
+:host(.light) .panel .sub,:host(.light) .panel .shown{color:#52525b}
+:host(.light) .panel hr{border-top-color:rgba(0,0,0,.12)}
+:host(.light) .panel .pause{color:#52525b}
+:host(.light) .panel .pause:hover{color:#18181b}
+/* 复制的对勾在浅底上要压深，否则 #4ade80 在白卡里发飘 */
+:host(.light) .act.done{color:#15803d}
 .toast{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);padding:7px 13px;
   border-radius:9px;background:rgba(24,24,27,.9);font-size:12px;
   opacity:0;transition:opacity ${ms(140)}ms ease}
@@ -108,6 +120,23 @@ button:hover{background:rgba(63,63,70,.9)}
     host.setAttribute('aria-label', Closer.t('viewerLabel'));
     host.lang = Closer.lang; // 中文标签要按中文读，不能跟着页面语言走
     host.tabIndex = -1; // 不 focus：键位靠 window capture，不需要焦点（6.7）
+
+    // 宿主自己的样式全部走 inline，一条都不许写在 :host 里。
+    //
+    // 2026-10-23 的真实事故（阮一峰周刊 416）：那个页面有一条 `div{color:#111}`，
+    // 而我们的宿主就是一个 <div id="closer">。**外层树的普通声明优先于 shadow 树的
+    // :host 声明**（CSS Scoping，与特异性无关），于是 `:host{color:#f5f5f5}` 整条被
+    // 盖掉——ⓘ 与三个动作全变成 #111 压在 #0b0b0c 背板上，等于消失；ⓘ 面板里的
+    // 「600 × 400」同样变黑。桩页面里颜色都是继承来的（inherit 输给任何声明），
+    // 所以自动化一直是绿的。
+    //
+    // inline 的优先级高于任何非 !important 的页面规则；`all:initial` 顺带挡掉
+    // max-width / margin / font 这些同样会命中宿主的属性，否则页面一句
+    // `div{max-width:1200px}` 就能把全屏容器压窄。
+    host.style.cssText =
+      'all:initial;position:fixed;inset:0;z-index:2147483647;overflow:hidden;' +
+      'contain:layout style;font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif;' +
+      'color:#f5f5f5';
 
     shadow = host.attachShadow({ mode: 'open' });
 
