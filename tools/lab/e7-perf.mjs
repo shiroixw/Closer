@@ -231,15 +231,13 @@ await sleep(120);
 /* --- 3a. 悬停提示用**真实鼠标**验一次（D32） ---
    e4 用合成 PointerEvent 验判据逻辑，这里补的是「浏览器真的会派 pointerover、
    光标真的黏得住又放得掉」，两者缺一都不算测过。 */
-// 「dwell 期间还没写」这一步用**同步读**判，不靠 sleep 卡时间：
-// CPU 4× 降速下 CDP 往返本身就可能超过 dwell，按毫秒采样会假红。
-const immediate = await ev(`(() => {
+// 「进入即生效」用**同步读**判：dispatch 之后在同一个任务里读，光标必须已经写好。
+// 没有 dwell 了（D32），所以这条断言本身就是「零延时」的判据。
+const dwelled = await ev(`(() => {
   const img = document.getElementById('big');
   img.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
-  return img.style.cursor; // 同一个任务里读：计时器还没到点，必须还是空
+  return img.style.cursor;
 })()`);
-await sleep(200); // 越过 DWELL(70)
-const dwelled = await ev(`document.getElementById('big').style.cursor`);
 await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 4, y: 4, button: 'none' });
 await sleep(100);
 const left = await ev(`({
@@ -247,9 +245,9 @@ const left = await ev(`({
   attr: document.getElementById('big').hasAttribute('style'),
 })`);
 check(
-  '悬停提示：dwell 期间不写、之后给 zoom-in、移开即还原',
-  immediate === '' && dwelled === 'zoom-in' && left.cursor === '' && left.attr === false,
-  `同步=${JSON.stringify(immediate)} 200ms=${JSON.stringify(dwelled)} 离开=${JSON.stringify(left)}`
+  '悬停提示：进入即写 zoom-in、移开即还原',
+  dwelled === 'zoom-in' && left.cursor === '' && left.attr === false,
+  `同任务=${JSON.stringify(dwelled)} 离开=${JSON.stringify(left)}`
 );
 
 await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: spot.x, y: spot.y, button: 'none' });

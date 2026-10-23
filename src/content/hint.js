@@ -25,24 +25,20 @@ var Closer = (window.Closer ||= {});
 
 Closer.hint = (function () {
   const ZOOM = 'zoom-in';
-  // 停多久才算「停下来看这张图」。它买的是「掠过图集不闪」，代价就是这一点点滞后。
+  // 没有 dwell：指针进入就写，离开就撤——**和站点自己写 `img{cursor:zoom-in}` 完全一致**。
   //
-  // 2026-10-23 实测（阮一峰周刊 416）：judge() 0.0128 ms、getComputedStyle 0.0002 ms，
-  // 也就是**省掉判断换不来体感**——滞后 100% 来自这个数。所以旋钮只有一个，别去预先
-  // 扫全页缓存 judge 结果：那要处理懒加载与尺寸变化带来的失效，省下的却是 13 µs。
+  // 曾经有过一版 140 ms（后来 70 ms）的停留判定，理由是「掠过图集不闪、只在指针停下时
+  // 才改页面」。2026-10-23 实测把它否掉了：judge() 0.0128 ms、getComputedStyle 0.0002 ms、
+  // 写一次 inline style 微秒级——所谓「预处理/降低判断成本」省的只有 13 µs，而它带来的
+  // 77–91 ms 端到端延迟是纯粹的手感损失。而「掠过一个图集时光标跳几下」恰恰是原生
+  // `img{cursor:zoom-in}` 的行为，用户把它读成「这些能点」，不是闪。
   //
-  // 70 ms：低于「看起来是即时」的 100 ms 阈值（同宪法的首帧预算），又高于指针掠过
-  // 缩略图时停留的几十毫秒。改这个数只该有一个理由——真机手感，不是直觉。
-  const DWELL = 70;
+  // 代价（如实记着）：指针扫过一排缩略图会多几次 inline 写，每次微秒级，且都在
+  // pointerover / 下一个目标上即时撤销。
 
-  let timer = 0;
-  let want = null; // 正在等计时的那张图
   let cur = null; // { el, had, prev }：光标此刻被我们改着的那张图
 
   function restore() {
-    clearTimeout(timer);
-    timer = 0;
-    want = null;
     if (!cur) return;
 
     const { el, had, prev } = cur;
@@ -73,18 +69,12 @@ Closer.hint = (function () {
     // 而漏提示按第二条是可接受的。
     const img = e.target instanceof Element ? e.target.closest('img') : null;
     if (!img) return restore();
-    if (cur && cur.el === img) return; // 已经亮着，别把计时器重开
-    if (want === img) return; // 同一张图在计时中
+    if (cur && cur.el === img) return; // 已经亮着
 
     restore(); // 换了目标：先把上一张收干净
     if (!Closer.state.ready || Closer.isPaused() || Closer.overlay.isOpen()) return;
 
-    want = img;
-    timer = setTimeout(() => {
-      timer = 0;
-      want = null;
-      show(img);
-    }, DWELL);
+    show(img);
   }
 
   return {
