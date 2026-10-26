@@ -73,8 +73,9 @@ for (const p of manifest.optional_host_permissions ?? []) {
   if (p !== '*://*/*') warnings.push(`optional_host_permissions 含非常规值：${p}`);
 }
 
-// ── 3. 体积预算（宪法第六条：content 侧 ≤ 60 KB 未压缩）──
-const BUDGET = 60 * 1024;
+// ── 3. 体积预算（宪法第六条：content 侧 ≤ 64 KB 未压缩）──
+// 60 → 64 KB 是 2026-10-23 与「监听 2 → 3」同一条修正案里改的，见 D32。
+const BUDGET = 64 * 1024;
 let contentBytes = 0;
 const walk = (dir) => {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -86,8 +87,8 @@ const walk = (dir) => {
 if (existsSync(join(ROOT, 'src/content'))) walk(join(ROOT, 'src/content'));
 if (contentBytes > 0) {
   const kb = (contentBytes / 1024).toFixed(1);
-  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 60 KB 预算（宪法第六条）`);
-  else warnings.push(`content 侧源码 ${kb} KB / 60 KB 预算`);
+  if (contentBytes > BUDGET) errors.push(`content 侧源码 ${kb} KB 超过 64 KB 预算（宪法第六条）`);
+  else warnings.push(`content 侧源码 ${kb} KB / 64 KB 预算`);
 }
 
 // ── 4. 每个发布文件都必须能解析 ──────────────────────────
@@ -114,7 +115,7 @@ for (const f of [...jsFiles, ...(existsSync(bgPath) ? [bgPath] : [])]) {
 }
 
 // ── 5. content 侧共用同一个全局词法环境，顶层声明不得撞名 ──
-// 无构建的代价：8 个文件按 manifest 顺序注入同一个隔离世界。
+// 无构建的代价：9 个文件按 background 的 FILES 顺序注入同一个隔离世界。
 // 顶层 const 重名是 SyntaxError（整份 content 脚本不执行，页面完全没反应）；
 // function 重名是静默覆盖（后者赢，行为取决于文件名顺序）。
 // 而第 4 节是逐文件 node --check，结构上永远看不见跨文件冲突——

@@ -78,6 +78,11 @@ var Closer = (window.Closer ||= {});
     // 这条路径一个字节都不改——不拦默认行为，站点自己的放大缩小照常。
     if (Closer.shelled(img)) return;
 
+    // 撤销悬停光标（D32）。必须在取基线之前：skin 判据读的是 style 属性，
+    // 我们的撤销若跨过这次基线，页面明明没动也会被判成「认领了这次点击」。
+    // 可选链与 core.js 同理：扩展刚更新过的旧页面里可能没有 hint.js，别把点击带崩。
+    Closer.hint?.reset?.();
+
     // 第三参 img 供 skin 判据记基线（case 007：站点就地放大，元素身份不变）
     const base = Closer.snapshot(e.clientX, e.clientY, img);
     e.preventDefault(); // 只掐默认行为，不阻断传播：页面自己的处理器照常跑
@@ -88,8 +93,9 @@ var Closer = (window.Closer ||= {});
   }
 
   Closer.load().finally(() => {
-    // 宪法第六条：加载期最多 2 个监听。这就是全部两个。
+    // 宪法第六条：加载期最多 3 个监听（2026-10-23 由 2 改成 3，见 D32）。这就是全部三个。
     addEventListener('pointerdown', onPointerDown, true);
     addEventListener('click', onClick, true);
+    Closer.hint?.attach?.(); // 悬停提示：页面上能打开的那张图给原生 zoom-in
   });
 })();
