@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Closer — Privacy Policy</title>
+<style>
+  :root { color-scheme: dark light; }
+  body {
+    margin: 0 auto; padding: 56px 24px 96px; max-width: 720px;
+    background: #0b0b0c; color: #e8e8e6;
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 40px 0 12px; }
+  p, li { color: #c9c9c6; }
+  p { margin: 0 0 12px; }
+  ul { margin: 0 0 12px; padding-left: 20px; }
+  li { margin: 0 0 6px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: #9fe8c0; }
+  .meta { color: #8a8a86; font-size: 14px; }
+  hr { border: 0; border-top: 1px solid #26262a; margin: 56px 0; }
+  a { color: #7cc4ff; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fff; color: #18181b; }
+    p, li { color: #3f3f46; }
+    .meta { color: #71717a; }
+    hr { border-top-color: #e4e4e7; }
+    code { color: #15803d; }
+    a { color: #1d4ed8; }
+  }
+</style>
+
+<h1>Closer — Privacy Policy</h1>
+<p class="meta">Last updated: 2026-10-26 · Version 0.1.0</p>
+
+<p>Closer is a Chrome extension that opens the image you click at its real size. This page describes exactly what it does with data. It is short because the extension does very little: no account, no server, no analytics, no third-party code.</p>
+
+<h2>What Closer does not do</h2>
+<ul>
+  <li>It does not collect, transmit, sell, or share any personal data. There is no backend of any kind.</li>
+  <li>It does not use analytics, telemetry, crash reporting, remote configuration, or feature flags.</li>
+  <li>It does not load remote code. Every line that runs ships inside the extension package and is readable in the source.</li>
+  <li>It does not read page text, form values, clipboard contents, browsing history, or cookies as data.</li>
+  <li>It does not track you across sites, and it stores nothing that identifies you.</li>
+</ul>
+
+<h2>What stays on your device</h2>
+<p>Two small settings are kept in the browser's local extension storage (<code>chrome.storage.local</code>) and never leave the machine:</p>
+<ul>
+  <li>the backdrop style you picked (dark, light, or checkerboard);</li>
+  <li>the list of sites you paused Closer on.</li>
+</ul>
+<p>Removing the extension deletes both. There is no sync and no copy elsewhere.</p>
+
+<h2>The one network request</h2>
+<p>When you open an image, Closer asks the browser for the bytes of <strong>that image's own URL</strong>, so it can show the true file size and format — and, if you click save, hand you the original file. The request goes to the site that served the image, with the browser's normal credentials for that site; Closer adds no server of its own to the path, and no header that identifies you.</p>
+<p>Those bytes are measured in memory and then discarded. Nothing is uploaded, nothing is written to disk unless you explicitly save the image. Opening an image that is already cached triggers no network request at all.</p>
+
+<h2>Permissions, and why each one is needed</h2>
+<ul>
+  <li><code>storage</code> — remembers the two settings listed above, locally.</li>
+  <li><code>scripting</code> — injects the viewer into the page you are already looking at.</li>
+  <li><code>activeTab</code> — when you click the toolbar icon, reads only the current tab's site name so the popup can say where you are.</li>
+  <li><code>Optional site access (all sites)</code> — Closer works on any page, so it asks once, from a button you press, for permission to run on sites you visit. Until you press it, Closer does nothing at all. It can be revoked at any time from the welcome page, the popup, or <code>chrome://extensions</code>, and the viewer is unregistered immediately.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Questions or a bug report: <a href="https://github.com/shiroixw/Closer/issues">github.com/shiroixw/Closer/issues</a>.</p>
+<p>If this policy changes, the date at the top changes with it.</p>
+
+<hr>
+
+<h1 lang="zh-CN">Closer — 隐私政策</h1>
+<p class="meta" lang="zh-CN">最后更新：2026-10-26 · 版本 0.1.0</p>
+
+<div lang="zh-CN">
+  <p>Closer 是一个 Chrome 扩展：点任意一张图，按它原本的尺寸看清它。这一页说明它到底怎么对待数据。篇幅短，是因为它做的事很少——没有账号、没有服务器、没有埋点、没有第三方代码。</p>
+
+  <h2>Closer 不做什么</h2>
+  <ul>
+    <li>不收集、不上传、不出售、不共享任何个人数据。它背后没有任何服务端。</li>
+    <li>不使用统计分析、崩溃上报、远程配置或功能开关。</li>
+    <li>不加载远程代码。跑起来的每一行都随扩展一起发布，源码可读。</li>
+    <li>不读取页面正文、表单内容、剪贴板、浏览历史，也不把 Cookie 当作数据读取。</li>
+    <li>不做跨站追踪，不存储任何能指向你个人的信息。</li>
+  </ul>
+
+  <h2>留在你设备上的东西</h2>
+  <p>两项小设置保存在浏览器本地的扩展存储（<code>chrome.storage.local</code>）里，永远不会离开这台机器：</p>
+  <ul>
+    <li>你选择的背板样式（深色 / 浅色 / 棋盘）；</li>
+    <li>你在哪些站点上暂停了 Closer。</li>
+  </ul>
+  <p>卸载扩展即一并删除。没有云同步，也没有第二份拷贝。</p>
+
+  <h2>唯一的一次网络请求</h2>
+  <p>打开一张图时，Closer 会向 <strong>这张图自己的地址</strong> 取回字节，用来显示真实文件大小与格式；如果你点保存，则用它把原文件交给你。请求发往提供这张图的站点，携带的是浏览器对该站点的常规凭证；Closer 不会在这条链路上加入自己的服务器，也不加任何能标识你的头。</p>
+  <p>这些字节只在内存里被测量，随后丢弃。不上传、不写盘——除非你主动保存这张图。打开一张已被浏览器缓存的图，不会产生任何网络请求。</p>
+
+  <h2>权限与用途</h2>
+  <ul>
+    <li><code>storage</code> — 在本机记住上面那两项设置。</li>
+    <li><code>scripting</code> — 把查看器注入你正在看的那个页面。</li>
+    <li><code>activeTab</code> — 点工具栏图标时，只读当前标签页的站点名，让 popup 能告诉你现在在哪。</li>
+    <li><code>可选的站点访问（所有站点）</code> — Closer 要在任何页面上工作，所以它只在你按下那个按钮时、一次性申请在你访问的站点上运行的权限。在你按之前，它什么都不做。你可以随时在欢迎页、popup 或 <code>chrome://extensions</code> 里撤销，查看器会立即注销。</li>
+  </ul>
+
+  <h2>联系</h2>
+  <p>疑问或问题反馈：<a href="https://github.com/shiroixw/Closer/issues">github.com/shiroixw/Closer/issues</a>。</p>
+  <p>本政策若有改动，顶部的日期会跟着改。</p>
+</div>
+</html>
