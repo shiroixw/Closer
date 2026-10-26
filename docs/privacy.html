@@ -45,8 +45,9 @@
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
-  html[data-one][lang="zh-CN"] [lang="en"],
-  html[data-one][lang="en"] [lang="zh-CN"],
+  /* 只管 <body> 里的东西，理由同 index.html（cases 013） */
+  html[data-one][lang="zh-CN"] body [lang="en"],
+  html[data-one][lang="en"] body [lang="zh-CN"],
   html[data-one] .both-only { display: none !important; }
 
   * { box-sizing: border-box; }

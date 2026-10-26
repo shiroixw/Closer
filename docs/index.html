@@ -62,9 +62,11 @@
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
-  /* 两种语言并排写在 DOM 里，按 <html lang> 只留一种。 */
-  html[lang="zh-CN"] [lang="en"],
-  html[lang="en"] [lang="zh-CN"] { display: none !important; }
+  /* 两种语言并排写在 DOM 里，按 <html lang> 只留一种。
+     只管 <body> 里的东西：扩展、翻译插件这类东西会把节点挂在 <html> 下并带上自己的 lang，
+     写成 `html[lang] [lang]` 会把它们一起藏掉——Closer 自己就被这样藏过（cases 013）。 */
+  html[lang="zh-CN"] body [lang="en"],
+  html[lang="en"] body [lang="zh-CN"] { display: none !important; }
 
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
