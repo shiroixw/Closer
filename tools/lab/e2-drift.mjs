@@ -10,7 +10,7 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 
 const PORT = 8821;
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">

@@ -7,11 +7,12 @@ import vm from 'node:vm';
 const SRC = new URL('../src/content/detect.js', import.meta.url);
 const src = fs.readFileSync(SRC, 'utf8');
 
-// judge() 现在会摸 getComputedStyle（cursor 判据），桩里给一个只看 __cursor 的假实现。
+// judge() 现在会摸 getComputedStyle（cursor 与 zIndex 两个判据），桩里给一个只看
+// __cursor / __z 的假实现。zIndex 缺省给 'auto'，和浏览器对未声明的元素一致。
 const ctx = {
   window: {},
   document: { body: {}, documentElement: {} },
-  getComputedStyle: (n) => ({ cursor: n?.__cursor || 'auto' }),
+  getComputedStyle: (n) => ({ cursor: n?.__cursor || 'auto', zIndex: n?.__z ?? 'auto' }),
 };
 vm.createContext(ctx);
 vm.runInContext(src, ctx);
@@ -20,15 +21,17 @@ const judge = ctx.window.Closer.judge;
 // 桩：closest 只认「这个节点身上挂了哪些选择器片段」。
 // 真实选择器按逗号拆开后，正好都是这些片段。
 // href 给出时，closest('a') 返回一个能被 getAttribute 读到的锚点。
-// cursor / parentCursor 用来构造 cursor:pointer 的继承链。
-function img({ nw = 800, nh = 600, w = 400, h = 300, closest = [], href, cursor = 'auto', parentCursor } = {}) {
+// parents 是自近而远的祖先，用来构造 cursor:pointer 的继承链（clickBox）
+// 与负 z-index 的背景层（behind）。
+function img({ nw = 800, nh = 600, w = 400, h = 300, closest = [], href, cursor = 'auto', z, parents = [] } = {}) {
   const set = new Set(closest);
   const anchor = href === undefined ? null : { getAttribute: (n) => (n === 'href' ? href : null) };
   const node = {
     naturalWidth: nw,
     naturalHeight: nh,
     __cursor: cursor,
-    parentElement: parentCursor ? { __cursor: parentCursor, parentElement: null } : null,
+    __z: z,
+    parentElement: parents.reduce((down, p) => ({ __cursor: p.cursor || 'auto', __z: p.z, parentElement: down }), null),
     getBoundingClientRect: () => ({ width: w, height: h }),
     closest(selector) {
       if (!selector) return null;
@@ -65,7 +68,7 @@ const cases = [
   ['图片直链带查询串', img({ closest: ['a'], href: '/assets/photo.JPG?w=800' }), true],
   // 卡片：H5 活动页把整块做成 section + JS 事件委托，点击后只改自己的文字/class，
   // 让位检测完全看不见。图片本身 pointer 是继承来的，声明的边界在父容器上。
-  ['配置卡片的横幅图（cursor 继承自容器）', img({ cursor: 'pointer', parentCursor: 'pointer' }), false],
+  ['配置卡片的横幅图（cursor 继承自容器）', img({ cursor: 'pointer', parents: [{ cursor: 'pointer' }] }), false],
   ['图片自己声明 cursor:pointer', img({ cursor: 'pointer' }), false],
   ['普通正文图', img({ cursor: 'auto' }), true],
   // 正方形小图：二维码、头像。门槛 600，代价是正方形插画被一起跳过（D25）。
@@ -74,6 +77,12 @@ const cases = [
   ['599×599（仍然算小正方形）', img({ nw: 599, nh: 599, w: 300, h: 300 }), false],
   ['600×600 不小了，照常打开', img({ nw: 600, nh: 600, w: 400, h: 400 }), true],
   ['800×800 正方形大图（可能是作品）', img({ nw: 800, nh: 800, w: 400, h: 400 }), true],
+  // 背景层：页面用 <img> 当版面的底（salesforce 的 blade 背景），内容压在上面。
+  // 负 z-index 是作者自己说的「我是底」；0 与 auto 都不是，内容图也会用它们抬层（D33）。
+  ['图自己声明 z-index:-1', img({ z: -1 }), false],
+  ['父容器声明 z-index:-1（背景层 wrapper）', img({ parents: [{ z: -1 }] }), false],
+  ['祖先声明 z-index:-1（图自己是 auto）', img({ parents: [{}, { z: -1 }] }), false],
+  ['祖先声明 z-index:0（抬进自己的层，不是背景）', img({ parents: [{ z: 0 }] }), true],
 ];
 
 let pass = 0;

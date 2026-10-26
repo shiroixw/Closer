@@ -4,8 +4,7 @@
 // 所以这里把真实的内容脚本注入一个普通页面，用 chrome API 桩顶住，
 // 跑的是同一份 overlay.js / boot.js / judge()。装扩展前能挡掉 90% 的低级错误。
 //
-// 用法：先有一个带调试端口的 Chrome（CDP=http://127.0.0.1:9333），然后
-//   node tools/lab/e4-overlay.mjs
+// 用法：node tools/lab/e4-overlay.mjs（默认 headless，见 browser.mjs；CDP=… 可改连有界面的实例）
 
 import http from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -14,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { clean } from './clean-extensions.mjs';
 
 const PORT = 8824;
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 // 同 check-manifest：URL.pathname 在 Windows 上是 /D:/...，拼出来是 D:\D:\...
 const ROOT = resolve(import.meta.dirname, '../..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -467,6 +466,48 @@ if (!ready) {
     s.open === true && s.src === true,
     `${JSON.stringify(inner.value)} ${JSON.stringify(s)}`
   );
+
+  await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(480);
+
+  // 8. 版面的底（真实站点 cases 012，bilibili 页头）：全宽横幅 <img> + 一层视差 <img>，
+  //    上面压着装着 logo 链接、铺满横幅的内容层。点内容层空白处，pick() 能按命中点找回图，
+  //    但那是页头的底，不是被装饰盖住的那张图——不接管。z-index 全是 auto/0，负 z-index（D33）兜不住。
+  //    inline 写死尺寸：桩页面的 `div{max-width:300px}` 会把普通 div 压窄。
+  const bleed = await evalx(`(() => {
+    const b = document.createElement('div');
+    b.id = 'bleed';
+    b.style.cssText = 'position:fixed;left:0;top:0;width:100vw;max-width:none;height:150px;margin:0;z-index:0';
+    b.innerHTML =
+      '<img id="bleed-img" src="/img.png" style="position:absolute;inset:0;width:100%;height:150px;object-fit:cover">' +
+      '<div style="position:absolute;inset:0;max-width:none;margin:0"><img id="bleed-layer" src="/img.png" style="width:130vw;height:150px;margin-left:-15vw;object-fit:cover"></div>' +
+      '<div id="bleed-inner" style="position:relative;width:100%;max-width:none;height:150px;margin:0"><a href="/" style="position:absolute;left:20px;top:40px">logo</a></div>';
+    document.body.appendChild(b);
+    return 1;
+  })()`);
+  void bleed;
+  await sleep(300);
+  const banner = await evalx(`(() => {
+    const inner = document.getElementById('bleed-inner');
+    const x = Math.round(innerWidth / 2), y = 100;
+    const img = Closer.pick(inner, x, y);
+    inner.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y }));
+    const under = document.elementsFromPoint(x, y).find((n) => n instanceof HTMLImageElement);
+    return {
+      stack: document.elementsFromPoint(x, y).slice(0, 4).map((n) => n.tagName + (n.id ? '#' + n.id : '')),
+      pick: img ? img.id : null,
+      underJudge: under ? Closer.judge(under) : null, // 判断器本身放行，挡住它的只能是 pick()
+    };
+  })()`);
+  await sleep(360);
+  const bannerOpen = await evalx(`!!document.getElementById('closer')`);
+  const bv = banner.value || {};
+  check(
+    '版面的底（全宽横幅上压着内容层）：点内容层不接管',
+    bv.pick === null && bv.underJudge === true && bannerOpen.value === false,
+    `${JSON.stringify(bv)} open=${bannerOpen.value}`
+  );
+  await evalx(`document.getElementById('bleed').remove()`);
 }
 
 ws.close();

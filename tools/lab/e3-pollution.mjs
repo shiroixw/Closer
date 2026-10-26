@@ -16,7 +16,7 @@ import { execFile } from 'node:child_process';
 
 const PAGE_PORT = 8811;
 const IMG_PORT = 8812;
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 
 /* ---------- 造一张 320×240 的真 PNG ---------- */
 

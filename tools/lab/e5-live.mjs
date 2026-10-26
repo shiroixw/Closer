@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { clean } from './clean-extensions.mjs';
 
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 const TARGET = process.env.TARGET || 'https://www.ruanyifeng.com/blog/2026/10/weekly-issue-415.html';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -375,7 +375,9 @@ if (st) {
   }
   check('C5 面板体积行最终有数字', /\d\s?(B|KB|MB)$/.test(sizeText.trim()), `${sizeText || '（空）'} · 等 ${waited} ms`);
   // 文案跟着浏览器语言走（D29），所以判据是「站点名出现在按钮上」，而不是某个英文原句
-  check('C4 面板里的暂停按钮认得出当前站点', /127\.0\.0\.1/.test(panelState.pause || ''), panelState.pause);
+  // 站点名取自 TARGET（与 Closer.site() 同口径：去 www.），不写死某个 host
+  const site = new URL(TARGET).hostname.replace(/^www\./i, '').toLowerCase();
+  check('C4 面板里的暂停按钮认得出当前站点', (panelState.pause || '').includes(site), panelState.pause);
 
   await evaluate("document.getElementById('closer').shadowRoot.querySelector('.info').click()");
   await sleep(150);

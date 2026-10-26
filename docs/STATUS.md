@@ -35,17 +35,17 @@
 
 | 验收 | 结果 |
 |---|---|
-| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 27/27、尺寸与文件名 31/31、顶层声明 35 个无撞名） |
-| `npm run smoke` | ✅ 2026-10-23 全量复跑 **63/63**（e4 23 + e6 16 + e10 18 + e7 6）。**假红仍要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败，原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
+| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 **35/35**、尺寸与文件名 31/31、顶层声明 36 个无撞名） |
+| `npm run smoke` | ✅ 2026-10-26 全量复跑 **63/63**（e4 23 + e6 16 + e10 18 + e7 6）。**假红仍要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败，原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
 | `npm run live` | ⚠️ 部分复跑：`e8` **25/25**（三档背板 + 面板配色）；`e5`（真实站点）、`e9`（偏好联动）未跑 |
-| content 侧体积 | ⚠️ **64.2 KB / 66 KB**（余量 **1.8 KB**；`hint.js` + 真机配色修复后实测。原为 59.1 / 60 → 悬停提示挪到 64 → 配色修复挪到 66，再挪就是第三次） |
+| content 侧体积 | ✅ **65.9 KB / 72 KB**（余量 **6.1 KB**。2026-10-26 用户放宽空间限制，预算 66 → 72 KB（宪法第六条第三次修正，代价写在那里）；被判据压过一轮的注释已恢复完整版。原为 59.1 / 60 → 悬停提示挪到 64 → 配色修复挪到 66 → 判断器两条新判据后放宽到 72） |
 | 速度（CPU 4×） | ⚠️ judge **0.010 ms** · 首帧 **34.2 ms** · 加载期 **3 个**监听（+`pointerover`，D32；e7 未复跑） |
 
 ## 模块状态
 
 | 模块 | 文件 | 状态 | 证据 |
 |---|---|---|---|
-| 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` 27/27（含 cursor:pointer 3 条、正方形 5 条） |
+| 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` **35/35**（含 cursor:pointer 3 条、正方形 5 条、负 z-index 背景层 4 条、pointer 语义光标若干） |
 | 点击目标解析 `pick()` | `src/content/detect.js` | ✅ | target 不是图时按命中点栈找回，并逐层下钻 shadow root（`cases.md` 004 / 005）；e4 两条形态断言 + 真实图库页实测 |
 | 点击契约（§3.1 四条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区 / 点中链接或控件，都在 `judge()` 之前判掉；e4 与 e5 全绿 |
 | 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 16/16（含「查看器里再点一次」S3、慢挂后 L4、zoom / box）；e10 合并后 18 条（11 + 遮罩与图是兄弟 M1/M2 + 兄弟遮罩 B1–B5），**合并后待复跑**；知乎真机修前 5/5 复现 |
@@ -137,6 +137,7 @@
 | **e7/e8/e9 会因窗口大小假红**：点击坐标取自元素几何，而这三个测试从不约束视口。窗口被缩到 583×311 后，1200×800 图的中心落在视口外，`elementFromPoint` 返回 null，报「overlay 没打开」——看起来像产品坏了 | 连跑 e7 三次稳定失败；加诊断打印 `vw/vh/at` 才看清 | 三个测试统一 `Emulation.setDeviceMetricsOverride` 1280×900，e7 连跑三次 5/5 |
 | **e5 用整页 outerHTML 长度当「DOM 已还原」的判据**：真实站点上第三方脚本随时改 DOM（实测评论区被挂 `style="!important"`，凭空 +19 字符），断言因此误红 | 打印首个差异位置，发现改动在 `#comments`，与图片查看无关 | 判据改为「`<html>` 属性与子节点数未变」，逐字节还原仍由 e4 在可控桩页面验 |
 | **已授权却仍显示「Needs site access / Allow」**：`popup.js` 里 `permRow.hidden = granted` 一直是对的，但 `ui.css` 的 `.row{display:flex}` 盖掉了 UA 的 `[hidden]{display:none}`（特异性只有 0,1,0）。JS 在设，页面不认 | 用户截图：状态是绿色「On for every site」却还挂着 Allow 按钮 | `ui.css` 加 `[hidden]{display:none!important}`，实测 hidden 态 computed display 为 `none` |
+| **背景图被接管**（用户报的 bad case，cases 010）：salesforce 把版面的底做成 `<img class="background__image">`，包在 `position:absolute;z-index:-1` 的 wrapper 里，内容压在上面。点标题或版面空白处，`pick()` 把这张底图找回来，`judge()` 13 条全过 → 点开一张背景图 | 用户给 URL；真机点空白处复现（`#closer` 出现，打开的是 `marquee-...-BG-min.png`）。**不改 `pick()`**：「图上盖了遮罩」（004/005）与「图是整版的底」DOM 完全同构，只能靠作者的声明区分 | 判断器第 13 条「图自己或某层祖先声明了负 z-index 即跳过」（D33）；`test-judge` 4 条（自己 -1 / 父级 -1 / 祖先 -1 / `z-index:0` 不算）；对照复验（salesforce 拒绝 headless，用它的 DOM 结构桩页）：**修前 3 条红、修后 4 条绿**，004 的遮罩形态仍能打开 |
 | **chrome 淡出后唤不回**：`wake()` 只在拖拽分支里调用，而 `.bar.idle` 带 `pointer-events:none`，`pointerenter` 永远收不到。用户必须滚轮或拖拽才能把按钮找回来 | 读代码；设计 5.2 明写「指针一动就回来」 | `manual-check` 第 11 条（自动化测不了手感） |
 | **整条顶栏吞掉「点背板关闭」**：`.bar` 是 `left:0;right:0` 的 flex 容器，两端之外都是命中区，点中 `onBar` 就不关闭 | 读代码 | `manual-check` 第 12 条 |
 | **`⇧` 复制地址不可发现**：设计 5.4 要求 tooltip 写明，实现里一个 `title` 都没有 | 读代码 | — |

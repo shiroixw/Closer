@@ -10,7 +10,7 @@
 //   node tools/lab/clean-extensions.mjs        # 独立跑
 //   import { clean } from './clean-extensions.mjs'   # e4/e5/e6 开头调用
 
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function json(pathname, init) {
