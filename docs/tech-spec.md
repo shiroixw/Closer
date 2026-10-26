@@ -347,7 +347,7 @@ host  (#closer, position:fixed; inset:0; overflow:hidden; all:initial; z-index:2
   │  ├ .info       左上 ⓘ
   │  └ .actions    右上：复制 / 保存 / 关闭
   ├ .panel         信息面板，absolute; top:56; left:14; width:232
-  └ .toast         role=status，底部居中，只在失败时出现
+  └ .toast         role=status，底部居中，成功与失败都在这里说
 ```
 
 `.backdrop` 必须和 `.photo` 平级，不能是 `.photo` 的父级——开启动画里图片要从缩略图尺寸连续放大，而背板是独立淡入的，两者时长不同。
@@ -361,7 +361,7 @@ overlay 打开期间，哪些事件必须被吃掉，在哪一层吃：
 | 事件 | 监听位置 | 处理 |
 | --- | --- | --- |
 | `wheel` | window / capture / `passive: false` | `preventDefault` + 缩放 |
-| `keydown` | window / capture | 拦我们的键，**外加 `Space` `PageUp` `PageDown` `Home` `End` `←→↑↓`** |
+| `keydown` | window / capture | 拦我们的键（含 `⌘/Ctrl + C` / `⌘/Ctrl + S`），**外加 `Space` `PageUp` `PageDown` `Home` `End` `←→↑↓`** |
 | `pointerdown` `pointermove` `pointerup` `pointercancel` | `.stage` | 拖拽，`setPointerCapture` |
 | `dblclick` | `.photo` | 切换 fit ↔ 100% |
 | `dragstart` | window / capture | `preventDefault`，防拖拽幽灵 |
@@ -370,6 +370,8 @@ overlay 打开期间，哪些事件必须被吃掉，在哪一层吃：
 | `click` | 不拦 | 背板点击关闭在 `.stage` 自己处理 |
 
 **最容易漏的一条是第二行加粗的那几个键。** 只拦 `Esc` `0` `1` `R` `F` `B` `I` `Enter` 是不够的：空格和方向键、`PageUp/PageDown`、`Home/End` 会漏给页面，页面在 overlay 背后滚动。用户看不到图在动（图是 fixed 的），但一关掉 overlay，人已经在页面别处了。
+
+`⌘/Ctrl + C` / `⌘/Ctrl + S` 是另一类：它们不是「漏给页面」，是浏览器自己要用（复制选区、网页另存为）。这两条必须 `preventDefault()` 才算我们的键，而带 `⌥/Alt` 的组合仍旧全部放行——那多半是输入法或系统在打字，不是用户在操作 overlay。`·`（详情）的判据要排在修饰键判断**之前**：它往往靠 `⌥⇧9` 这类组合打出，`e.altKey` 为真，按「带修饰键就放行」的写法会静默失效；同一个键在有的布局/输入法里落在 `` ` `` 上，那时 `e.key` 不可信，用 `e.code === 'Backquote'` 兜一层。
 
 `wheel` 必须显式 `{ passive: false }`，否则 `preventDefault` 不生效，页面照样滚。
 

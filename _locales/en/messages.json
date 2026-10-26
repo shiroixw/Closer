@@ -87,19 +87,19 @@
     "message": "Image info"
   },
   "infoTitle": {
-    "message": "Image info (I)"
+    "message": "Image info (I / ·)"
   },
   "copyLabel": {
     "message": "Copy image"
   },
   "copyTitle": {
-    "message": "Copy image (⇧ click: copy address)"
+    "message": "Copy image (Ctrl/⌘ C · ⇧ click: copy address)"
   },
   "saveLabel": {
     "message": "Save image"
   },
   "saveTitle": {
-    "message": "Save image"
+    "message": "Save image (Ctrl/⌘ S)"
   },
   "closeLabel": {
     "message": "Close"
@@ -134,6 +134,15 @@
   },
   "copyTooLarge": {
     "message": "Too large to copy — address copied"
+  },
+  "copyDone": {
+    "message": "Copied"
+  },
+  "copyAddrDone": {
+    "message": "Address copied"
+  },
+  "saveDone": {
+    "message": "Download started"
   },
   "copyFailed": {
     "message": "Copy failed"
