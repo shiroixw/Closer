@@ -21,6 +21,8 @@
 
 | 009 | 2026-10-22 | 知乎文章页自带查看器：遮罩 `<div class=css-hr0k1l>` 与查看器 `<img class=css-ypb3io>` 都是 `<body>` 的直接子节点（**兄弟**），图 936×1250 盖不满 2560×1249 视口、也不锁滚动；点图缩小（`cursor: zoom-out`）只改 `transform`，随后整层卸载 | 五判据全哑：`href` / 全屏 / 滚动锁不变，命中点仍是同一个 `<img>`；`skin` 也来不及——站点在**我们判定之后**才写 `style`（实测决策帧 2.8 ms、首次写入 9.4 ms，5/5 都晚一步）；`remember()` 要求「覆盖 90% 视口的祖先」，而遮罩是兄弟、祖先链一步到 `body` → `state.shell` 从未写入。于是叠一层，600 ms 后被迟到纠正关掉（实测 17 ms 开、618 ms 关）。**还有一层**：放大那一下站点会把被点的缩略图设成 `visibility:hidden`，`acted()` 于是走 `skin` 分支直接 return，`remember()` 一次都不跑 → 修完之后「访问页面后的**第一次**缩小仍然会叠、后续不再叠」 | `shelled()` 加静态存量分支 `state.yielded && cursor === 'zoom-out'`（D31）；`e10` 新增 B1–B5 | `e10` B1–B5（修前 B2 红、修后绿）；真机知乎 5/5 复现（修前），同页 `zoom-out` 误伤计数 0 |
 
+| 010 | 2026-10-26 | Salesforce 保险代理页（`/ap/financial-services/insurance-agency-management-software/`）把版面的底做成 `<img class="background__image">`，包在 `position:absolute;z-index:-1` 的 `div.blade__background` 里，内容（标题、卡片）压在它上面。点击落在标题或版面空白处，会被我们接管，点开一张背景图 | **判断器 13 条全过**（2560×800、渲染 2560×508，不是链接/控件/对话框、不正方形、无 `cursor:pointer`），`pick()` 也确实把图找回来了——`elementsFromPoint` 栈里那张底图排在内容之下，`sameFrame()` 认的共同祖先恰好是整块 `<section>`。**结构性沉默**：`pick()` 只能判断「图与点击是不是同一块视觉单元」，它分不出「图上盖了遮罩」（004/005）与「图是整版的底」——两种形态 DOM 完全同构。悬停提示也不撒谎也没用：`e.target.closest('img')` 永远不命中底图，所以没有 `zoom-in` 光标，用户拿不到任何前兆 | 判断器第 13 条：图自己或某层祖先声明了负 `z-index`（作者自己说的「放到内容后面」）即跳过（D33）。**不修 `pick()`**：那两种形态在结构上无法区分，要区分只能靠作者的声明 | `test-judge` 四条（自己 -1 / 父级 -1 / 祖先 -1 / `z-index:0` 不算）；真机 salesforce 复验：背景图不再接管，正文图照常 |
+
 ## 写新条目时
 
 1. **先复现**：在真实页面上点一次，确认是误判还是漏判，别凭截图猜。

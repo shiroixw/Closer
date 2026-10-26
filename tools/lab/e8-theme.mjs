@@ -15,7 +15,7 @@ import http from 'node:http';
 import zlib from 'node:zlib';
 import { clean } from './clean-extensions.mjs';
 
-const CDP = process.env.CDP || 'http://127.0.0.1:9333';
+import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
 const PORT = 8833;
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -293,8 +293,40 @@ for (const want of THEMES) {
   check(`${want}: 背板底色`, st.bg === expect, `实际 ${st.bg}，期望 ${expect}`);
   check(`${want}: 背板铺满`, st.rect[0] === (await evaluate('innerWidth')) && st.rect[1] === (await evaluate('innerHeight')), `${st.rect}`);
 
-  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
-  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+  // 面板配色必须跟着主题走：按钮在浅色档翻成白底深字，卡片还是黑的，就是两套语言
+  const panel = await evaluate(`(() => {
+    const sr = document.getElementById('closer').shadowRoot;
+    sr.querySelector('.info').click();
+    const p = sr.querySelector('.panel');
+    const cs = getComputedStyle(p);
+    return {
+      open: !p.hidden,
+      bg: cs.backgroundColor,
+      color: cs.color,
+      sub: getComputedStyle(sr.querySelector('.ratio')).color,
+    };
+  })()`);
+  const PANEL = {
+    dark: { bg: 'rgba(24, 24, 27, 0.86)', color: 'rgb(245, 245, 245)', sub: 'rgb(161, 161, 170)' },
+    light: { bg: 'rgba(255, 255, 255, 0.92)', color: 'rgb(24, 24, 27)', sub: 'rgb(82, 82, 91)' },
+    checker: { bg: 'rgba(24, 24, 27, 0.86)', color: 'rgb(245, 245, 245)', sub: 'rgb(161, 161, 170)' },
+  }[want];
+  check(`${want}: ⓘ 面板能展开`, panel?.open === true);
+  check(`${want}: 面板底色跟着主题`, panel?.bg === PANEL.bg, `实际 ${panel?.bg}，期望 ${PANEL.bg}`);
+  check(
+    `${want}: 面板文字跟着主题`,
+    panel?.color === PANEL.color && panel?.sub === PANEL.sub,
+    `${panel?.color} / ${panel?.sub}`
+  );
+
+  const esc = async () => {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+  };
+  await esc(); // 先收面板
+  await sleep(200);
+  check(`${want}: Esc 先收面板、overlay 还在`, (await evaluate("!!document.getElementById('closer')")) === true);
+  await esc(); // 再关 overlay
   await sleep(450);
   check(`${want}: Esc 后已关闭`, (await evaluate("!document.getElementById('closer')")) === true);
 }

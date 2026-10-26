@@ -16,7 +16,7 @@
 | `node tools/lab/e2-drift.mjs` | 图片动的时候，命中点判据会不会脱靶（480 次比对，0 漂移） |
 | `node tools/lab/e3-pollution.mjs` | 跨域图经 blob 中转后 canvas 还污不污染（不污染，复制可做） |
 
-`verify` 无需浏览器。其余都需要本机有一个开着 `--remote-debugging-port=9333` 的 Chrome（E3/E4/E7/E8 自带页面；E5 走真实站点，需要网络）。
+`verify` 无需浏览器。其余脚本默认自己拉起一个**专用的 headless Chrome**（端口 9444、临时 profile，见 `tools/lab/browser.mjs`），没有窗口、不抢输入焦点与桌面焦点，跑完常驻复用，`node tools/lab/browser.mjs stop` 收掉。要看着跑时显式指定有界面的实例：`CDP=http://127.0.0.1:9333 npm run smoke`。E5 走真实站点，需要网络。
 
 ---
 

@@ -524,6 +524,7 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 | 重新注册会丢失差量之外的配置 | 每次 `sync()` 传完整对象，不做差量更新 |
 | `adoptedStyleSheets` 在 isolated world 的可用性 | 构造的 `CSSStyleSheet` 归属于文档，跨 world 可用；页面 CSP 也拦不住它 |
 | 页面被替换 `documentElement` | 打开时检查 `isConnected` |
+| 页面规则命中 shadow host | 外层树的普通声明**优先于** shadow 树的 `:host` 声明（CSS Scoping，与特异性无关）：页面一句 `div{color:#111}` 就能把整条 `:host{...}` 盖掉，顺带还能压 `max-width`。所以宿主的定位与调色板一律写 inline（`all:initial` + 属性），见 `overlay.js` 的 `ensure()` |
 
 ---
 
@@ -531,7 +532,7 @@ setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 
 | 预算 | 测法 |
 | --- | --- |
-| < 64 KB | `wc -c src/content/*.js \| tail -1`，或直接看 `tools/check-manifest.mjs` 的告警行 |
+| < 66 KB | `wc -c src/content/*.js \| tail -1`，或直接看 `tools/check-manifest.mjs` 的告警行 |
 | `judge()` < 1 ms | 开发时在控制台对同一张图跑 1000 次取平均；**不写进发布代码** |
 | 点击 → 首帧 < 100 ms | 同上，`performance.mark` 两次；只在本地验 |
 | 加载期 3 个监听 | `e7` 数 `boot.js` + `hint.js` 的 `addEventListener`（D32 后由 2 改成 3） |

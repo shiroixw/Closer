@@ -27,23 +27,25 @@
 
 **2026-10-23 第十轮（可发现性，D32）**：用户提「页面没给图片加 cursor，我们可以补个放大镜」。两条常驻路线都推演否掉：① `@layer` + `:where(img)` 确实是「最低优先级」的正解（未分层作者样式恒胜），但 `cursor` 是**继承**属性，在 `img` 上声明会打断继承——D24 那类「整卡 `pointer`、图只是内容」的页面会从手型变成放大镜，正好在页面把话说清楚的地方撒谎；CSS 读不到祖先的 computed cursor，`:has()` 只看结构，这是语言能力边界。② 自绘徽标要常驻 shadow host（overlay 的 host 开即建、关即拆，e4 的逐字节比对依赖它）+ 定位 + 淡入，比一行 cursor 贵，而且盖在画面上。落成：新增 `src/content/hint.js`，指针进入即给 `judge()` 判得开的那张图写 inline `cursor: zoom-in`；`getComputedStyle` 不是 `auto`（页面自己声明过手势）一律不碰；离开即还原，空 `style` 属性整个删掉；并**在 `snapshot()` 之前撤销**——`skin` 判据读的是 `style`，我们的撤销若跨过基线，会被误判成「页面认领了这次点击」。宪法第六条同日修正：监听 2 → 3、体积 60 → 64 KB。`e4` 新增 4 条悬停断言（15 → 19），`e7` 的监听断言改成数 `boot.js + hint.js`。同日先按体感把 dwell 从 140 降到 70 ms，再按实测把 dwell **整个去掉**：`judge()` 0.0128 ms、`getComputedStyle` 0.0002 ms、inline 写微秒级，端到端 77–91 ms 全是 dwell 买的，而零延时才是 `img{cursor:zoom-in}` 的原生行为；同理也**没有**做「加载期预扫全页缓存判断」——省的 13 µs 不够付缓存失效的账。`e7` 改成「dispatch 之后同一任务里必须已写入」，等于把「零延时」写成断言。
 
+**同日第十一轮（真机两处配色，用户截图）**：用 CDP 在阮一峰周刊 416 上注入同一份脚本实测，量出两件事。① 顶部图标「几乎看不见」不是对比度问题，是**页面把它们刷黑了**：该页有 `div{color:#111}`，而外层树的普通声明优先于 shadow 树的 `:host` 声明（CSS Scoping，与特异性无关），(0,0,1) 的 `div` 盖掉了整条 `:host{color:#f5f5f5}`——ⓘ、三个动作、面板里的数字全变 `#111`。桩页面一直是绿的，因为那里的颜色来自 `body{color:#ddd}` 的继承，inherit 输给任何声明。修法：宿主样式全部改 inline（`all:initial` + 定位 + 字体 + 颜色），顺带挡住 `div{max-width}` 这类几何劫持。② 浅色背板下 ⓘ 面板仍是黑卡：按钮有 `:host(.light)` 分支，面板没有。补齐浅色面板（白卡 + 深字），棋盘档刻意不跟。`e4` 20 → 23（防劫持 3 条），`e8` 13 → 25（面板配色每档 4 条）。
+
 代码写完了，131 项自动断言全绿（本轮 `e4` 再 +4 = 135，`smoke` 未复跑）。但自动化一直用「临时副本 + 声明式 host 权限」绕过真实授权，
 所以 **`安装 → welcome → 点 Enable → 授权 → 动态注册` 这条链路一次都没被真人走通过**。
 按 `docs/manual-check.md` 走一遍（18 条），才算真的可上架。
 
 | 验收 | 结果 |
 |---|---|
-| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 27/27、尺寸与文件名 31/31、顶层声明 35 个无撞名） |
-| `npm run smoke` | ✅ 2026-10-23 全量复跑 **60/60**（e4 20 + e6 16 + e10 18 + e7 6）。**假红仍要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败，原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
-| `npm run live` | ⚠️ 未复跑（依赖外网真实站点；本轮只动让位路径，e5 的旧结果保留） |
-| content 侧体积 | ⚠️ **62.3 KB / 64 KB**（余量 **1.7 KB**；`hint.js` 加入后 `npm run verify` 实测。原为 59.1 / 60，第十轮按 D32 把预算抬到 64） |
+| `npm run verify` | ✅ 通过（6 个 manifest 引用、3 项权限、全部文件语法、语言包 2 种 × 39 个 key、判断器 **35/35**、尺寸与文件名 31/31、顶层声明 36 个无撞名） |
+| `npm run smoke` | ✅ 2026-10-26 全量复跑 **63/63**（e4 23 + e6 16 + e10 18 + e7 6）。**假红仍要留意**：浏览器刚启动或刚改完文件的那一轮会成片失败，原样复跑即全绿——判据本身是对的，是注入/加载时序没就绪（与 B6 同源） |
+| `npm run live` | ⚠️ 部分复跑：`e8` **25/25**（三档背板 + 面板配色）；`e5`（真实站点）、`e9`（偏好联动）未跑 |
+| content 侧体积 | ✅ **65.9 KB / 72 KB**（余量 **6.1 KB**。2026-10-26 用户放宽空间限制，预算 66 → 72 KB（宪法第六条第三次修正，代价写在那里）；被判据压过一轮的注释已恢复完整版。原为 59.1 / 60 → 悬停提示挪到 64 → 配色修复挪到 66 → 判断器两条新判据后放宽到 72） |
 | 速度（CPU 4×） | ⚠️ judge **0.010 ms** · 首帧 **34.2 ms** · 加载期 **3 个**监听（+`pointerover`，D32；e7 未复跑） |
 
 ## 模块状态
 
 | 模块 | 文件 | 状态 | 证据 |
 |---|---|---|---|
-| 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` 27/27（含 cursor:pointer 3 条、正方形 5 条） |
+| 判断器 `judge()` | `src/content/detect.js` | ✅ | `test-judge` **35/35**（含 cursor:pointer 3 条、正方形 5 条、负 z-index 背景层 4 条、pointer 语义光标若干） |
 | 点击目标解析 `pick()` | `src/content/detect.js` | ✅ | target 不是图时按命中点栈找回，并逐层下钻 shadow root（`cases.md` 004 / 005）；e4 两条形态断言 + 真实图库页实测 |
 | 点击契约（§3.1 四条放行） | `src/content/boot.js` | ✅ | 位移 > 6 px / 按住 > 600 ms / 按下时有选区 / 点中链接或控件，都在 `judge()` 之前判掉；e4 与 e5 全绿 |
 | 让位检测 | `src/content/yield.js` | ✅ 真机已验 | e6 16/16（含「查看器里再点一次」S3、慢挂后 L4、zoom / box）；e10 合并后 18 条（11 + 遮罩与图是兄弟 M1/M2 + 兄弟遮罩 B1–B5），**合并后待复跑**；知乎真机修前 5/5 复现 |
@@ -52,7 +54,7 @@
 | 命名空间 / 偏好 / 暂停列表 | `src/content/core.js` | ✅ | — |
 | 尺寸比例格式 | `src/content/meta.js` | ✅ | `test-meta` 31/31（含 fileName） |
 | 字节通道 | `src/content/bytes.js` + `src/background.js` | ✅ 真图已通 | e5：面板显示 `WEBP · 58 KB` |
-| 视图层 overlay | `src/content/overlay.js` | ✅ | e4：开、transform 生效、背板淡入、Esc 后 host 摘除、DOM 逐字节一致 |
+| 视图层 overlay | `src/content/overlay.js` | ✅ | e4 23/23：开、transform、背板淡入、Esc 后 host 摘除、DOM 逐字节一致，以及防劫持三条（页面 `div{color}` / `max-width` 盖不掉宿主）；e8 25/25：三档背板 + 面板配色 |
 | 悬停提示 `Closer.hint` | `src/content/hint.js` | ⚠️ 代码完成 / 手感待验 | e4 四条：判得开的图变 `zoom-in`、离开即还原且不留 `style` 属性、页面自己声明了 cursor 的不碰、判不过的（40px 头像）不给手势（D32）；手感见 manual-check 18 |
 | 复制 / 保存 | `src/content/actions.js` | ✅ 代码 / ⚠️ 剪贴板未验 | 需真人点（合成事件没有瞬时激活）；单边 > 16384 或 > 32 MP 时降级为复制地址（D26），这条路径同样要真人验 |
 | popup | `ui/popup.html` + `popup.js` | ✅ | 授权、按站点暂停、背景三选一；已授权时权限行不可见（e9） |
@@ -118,6 +120,8 @@
 
 | bug | 怎么发现的 | 断言 |
 |---|---|---|
+| **深色背板上顶部图标「几乎看不见」**（用户报，阮一峰周刊 416 实测）：ⓘ 与三个动作全是 `#111` 压在 `#0b0b0c` 背板上，ⓘ 面板的 `750 × 500` 也一起变黑 | 用 CDP 在真实页面注入同一份脚本，量到宿主 computed color 是 `rgb(17,17,17)`；页面 `document.styleSheets` 里有一条 `div{color:#111}` 命中 `<div id="closer">`。**外层树的普通声明优先于 shadow 树的 `:host` 声明**（CSS Scoping，与特异性无关），`div` 只有 (0,0,1) 也能盖掉 `:host{color:#f5f5f5}`。桩页面一直是绿的，因为那里的颜色是 `body{color:#ddd}` 继承来的，inherit 输给任何声明 | 宿主样式全部改为 inline（`all:initial` + 定位 + 字体 + 颜色），顺带挡住 `div{max-width}` 这类几何劫持；e4 新增三条（图标色 / 面板数字色 / 宿主仍全屏 fixed），桩页复刻 `div{color:#111;max-width:300px}`，**修前三条全红**（`rgb(17,17,17)`、`full=false`） |
+| **浅色背板下 ⓘ 面板仍是黑色卡片**（用户截图）：按钮已翻成白底深字，读数面板没跟，同一次操作里两套配色 | 用户截图；读 CSS 确认 `.panel` 没有 `:host(.light)` 分支 | `:host(.light) .panel` 一套（白卡 + `#18181b` 字 + 更浅的阴影），副文字 `#52525b`、分隔线 `rgba(0,0,0,.12)`、对勾 `#15803d`；棋盘档刻意不跟（白卡压白格没有边）；e8 每档新增 4 条（面板能展开 / 底色 / 文字 / Esc 先收面板再关） |
 | **遮罩与图并列时，缩小那一下又叠一层**（用户报的 bad case，cases 009）：知乎的查看器把遮罩和图都挂在 `<body>` 下，是兄弟不是祖先；点图缩小只改 `transform`，而且改写落在**我们判定之后**——五判据（含 `skin`）全哑，`remember()` 又记不下任何东西 → 叠一层，600 ms 后被迟到纠正关掉（真机 17 ms 开、618 ms 关） | 用户给 URL；真机插桩：文章图点击 → 站点同步挂查看器（我们让位）；查看器里再点 → `style` 首次写入 9.4 ms、我们决策帧 2.8 ms，5/5 都晚一步；`skin` 在桩页里同步改写时是有效的，改成 rAF 改写立刻复现（所以桩页必须复刻这个时序） | `shelled()` 加静态存量分支（D31）；`e10` B1–B5（修前 B2 红、修后绿）；同页 12 张图 `zoom-out` 误伤计数 0 |
 | **修完仍「第一次缩小会叠、后续不叠」**：放大那一下站点把被点的缩略图设成 `visibility:hidden`，`acted()` 走 `skin` 分支直接 return，`remember()` 一次都不跑 → `state.yielded` 到第一次缩小之后才落账 | 真机复验发现；桩页补上「点缩略图时设 hidden」后 B2 转红，证明缺口就在这条分支 | `acted()` 的 `skin` 分支也置位 `state.yielded`；e10 B1–B5（16/16）；真机待复验 |
 | **站点自己的查看器开着时，点里面那张图会再叠一层**（用户报的 bad case，站点后来找不到了）：第一次点击站点弹出全屏遮罩并展示原图，第二次点遮罩里的图 → 我们也弹一层 | 用自包含桩页复现（e10 先红后绿）：第二次点击前后 `href` / 全屏 / 命中点 / 滚动锁四项完全一样，全部沉默；`zoom` 变体进一步证明连站点自己的缩放都看不见——命中点比的是元素身份，`transform` 不改身份。静态尺寸阈值也不行：站点一缩小，缩略图与查看器里的图分不出 | `e10` 11 条（static / zoom / zoomout / 自愈 / app 外壳）+ `e6` S3、L4 |
@@ -133,6 +137,7 @@
 | **e7/e8/e9 会因窗口大小假红**：点击坐标取自元素几何，而这三个测试从不约束视口。窗口被缩到 583×311 后，1200×800 图的中心落在视口外，`elementFromPoint` 返回 null，报「overlay 没打开」——看起来像产品坏了 | 连跑 e7 三次稳定失败；加诊断打印 `vw/vh/at` 才看清 | 三个测试统一 `Emulation.setDeviceMetricsOverride` 1280×900，e7 连跑三次 5/5 |
 | **e5 用整页 outerHTML 长度当「DOM 已还原」的判据**：真实站点上第三方脚本随时改 DOM（实测评论区被挂 `style="!important"`，凭空 +19 字符），断言因此误红 | 打印首个差异位置，发现改动在 `#comments`，与图片查看无关 | 判据改为「`<html>` 属性与子节点数未变」，逐字节还原仍由 e4 在可控桩页面验 |
 | **已授权却仍显示「Needs site access / Allow」**：`popup.js` 里 `permRow.hidden = granted` 一直是对的，但 `ui.css` 的 `.row{display:flex}` 盖掉了 UA 的 `[hidden]{display:none}`（特异性只有 0,1,0）。JS 在设，页面不认 | 用户截图：状态是绿色「On for every site」却还挂着 Allow 按钮 | `ui.css` 加 `[hidden]{display:none!important}`，实测 hidden 态 computed display 为 `none` |
+| **背景图被接管**（用户报的 bad case，cases 010）：salesforce 把版面的底做成 `<img class="background__image">`，包在 `position:absolute;z-index:-1` 的 wrapper 里，内容压在上面。点标题或版面空白处，`pick()` 把这张底图找回来，`judge()` 13 条全过 → 点开一张背景图 | 用户给 URL；真机点空白处复现（`#closer` 出现，打开的是 `marquee-...-BG-min.png`）。**不改 `pick()`**：「图上盖了遮罩」（004/005）与「图是整版的底」DOM 完全同构，只能靠作者的声明区分 | 判断器第 13 条「图自己或某层祖先声明了负 z-index 即跳过」（D33）；`test-judge` 4 条（自己 -1 / 父级 -1 / 祖先 -1 / `z-index:0` 不算）；对照复验（salesforce 拒绝 headless，用它的 DOM 结构桩页）：**修前 3 条红、修后 4 条绿**，004 的遮罩形态仍能打开 |
 | **chrome 淡出后唤不回**：`wake()` 只在拖拽分支里调用，而 `.bar.idle` 带 `pointer-events:none`，`pointerenter` 永远收不到。用户必须滚轮或拖拽才能把按钮找回来 | 读代码；设计 5.2 明写「指针一动就回来」 | `manual-check` 第 11 条（自动化测不了手感） |
 | **整条顶栏吞掉「点背板关闭」**：`.bar` 是 `left:0;right:0` 的 flex 容器，两端之外都是命中区，点中 `onBar` 就不关闭 | 读代码 | `manual-check` 第 12 条 |
 | **`⇧` 复制地址不可发现**：设计 5.4 要求 tooltip 写明，实现里一个 `title` 都没有 | 读代码 | — |
