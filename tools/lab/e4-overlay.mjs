@@ -577,6 +577,91 @@ if (!ready) {
     intact: document.documentElement.outerHTML === window.__snap,
   })`);
   check('快捷键验完，Esc 关闭且 DOM 仍逐字节一致', afterKeys.value?.gone === true && afterKeys.value?.intact === true);
+
+  // 9. 页面样式表里的 !important 不能藏掉宿主（cases 013）。
+  //    真实事故是双语站的 `html[lang=en] [lang=zh-CN]{display:none!important}`：宿主带 lang，
+  //    overlay 开着却看不见，滚轮与按键照吞，页面像卡死。这里把几类常见写法一起压上去。
+  const clickBig = `(() => {
+    const img = document.getElementById('big');
+    img.scrollIntoView({ block: 'center' });
+    const r = img.getBoundingClientRect();
+    return img.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true, button: 0,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+    }));
+  })()`;
+  await evalx(`(() => {
+    const s = document.createElement('style');
+    s.id = 'hostile';
+    s.textContent =
+      'html[lang] [lang]:not(html){display:none!important}' +
+      '[role="dialog"]{visibility:hidden!important;opacity:0!important;pointer-events:none!important}' +
+      'html>div{position:static!important;width:0!important;height:0!important;transform:scale(0)!important;z-index:0!important}';
+    document.head.append(s);
+    document.documentElement.lang = 'en';
+    window.__snap2 = document.documentElement.outerHTML;
+  })()`);
+  await evalx(clickBig);
+  await sleep(420);
+  const hostile = await evalx(`(() => {
+    const h = document.getElementById('closer');
+    if (!h) return { open: false };
+    const r = h.getBoundingClientRect();
+    const p = h.shadowRoot.querySelector('.photo');
+    const before = p.style.transform;
+    window.dispatchEvent(new WheelEvent('wheel', { deltaY: -240, clientX: innerWidth / 2, clientY: innerHeight / 2, cancelable: true }));
+    return {
+      open: Closer.overlay.isOpen(),
+      lang: h.lang,
+      visible: h.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+      full: Math.round(r.width) === innerWidth && Math.round(r.height) === innerHeight,
+      wheel: p.style.transform !== before,
+      unseen: Closer.state.unseen,
+    };
+  })()`);
+  const hv = hostile.value || {};
+  check(
+    '页面 !important 规则藏不掉宿主（display / visibility / opacity / 尺寸 / 定位）',
+    hv.open === true && hv.visible === true && hv.full === true && hv.unseen === false,
+    JSON.stringify(hv)
+  );
+  check('同一场景下滚轮作用在看得见的图上', hv.wheel === true, JSON.stringify(hv));
+  await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(480);
+  const hostileClosed = await evalx(`!document.getElementById('closer') && document.documentElement.outerHTML === window.__snap2`);
+  check('关闭后 DOM 仍逐字节一致（含敌意样式的页面）', hostileClosed.value === true);
+
+  // 10. 兜底：宿主仍然被藏掉时（页面脚本改写它，或广告拦截的 user 来源 !important），
+  //     看不见就不接管——立刻退场，本页之后整页让位：不吃点击、不给光标。
+  await evalx(`(() => {
+    document.getElementById('hostile').remove();
+    document.documentElement.removeAttribute('lang');
+    window.__hider = new MutationObserver((ms) => {
+      for (const m of ms) for (const n of m.addedNodes)
+        if (n.nodeType === 1) n.style.setProperty('display', 'none', 'important');
+    });
+    window.__hider.observe(document.documentElement, { childList: true });
+    window.__snap3 = document.documentElement.outerHTML;
+  })()`);
+  await evalx(clickBig);
+  await sleep(300);
+  const unseen = await evalx(`({
+    open: Closer.overlay.isOpen(),
+    gone: !document.getElementById('closer'),
+    unseen: Closer.state.unseen,
+    intact: document.documentElement.outerHTML === window.__snap3,
+  })`);
+  const uv = unseen.value || {};
+  check('被藏掉的 overlay 下一帧自己退场', uv.open === false && uv.gone === true && uv.unseen === true, JSON.stringify(uv));
+  check('退场后 DOM 逐字节一致', uv.intact === true);
+  const again = await evalx(clickBig); // dispatchEvent 返回 false = 被 preventDefault
+  await sleep(200);
+  const againOpen = await evalx(`!!document.getElementById('closer')`);
+  check('之后的点击原样交还页面（不 preventDefault、不再打开）', again.value === true && againOpen.value === false);
+  await hover('big');
+  const hintUnseen = await evalx(`document.getElementById('big').style.cursor`);
+  check('之后也不给 zoom-in 光标（光标不说谎）', hintUnseen.value === '', String(hintUnseen.value));
+  await evalx(`window.__hider.disconnect()`);
 }
 
 ws.close();

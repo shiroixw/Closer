@@ -133,10 +133,25 @@ button:hover{background:rgba(63,63,70,.9)}
     // inline 的优先级高于任何非 !important 的页面规则；`all:initial` 顺带挡掉
     // max-width / margin / font 这些同样会命中宿主的属性，否则页面一句
     // `div{max-width:1200px}` 就能把全屏容器压窄。
-    host.style.cssText =
-      'all:initial;position:fixed;inset:0;z-index:2147483647;overflow:hidden;' +
-      'contain:layout style;font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif;' +
-      'color:#f5f5f5';
+    //
+    // 每一条都带 !important（2026-10-26，cases 013）：页面样式表里的 !important 胜过
+    // 普通 inline。双语站点常写 `html[lang=en] [lang=zh-CN]{display:none!important}`，
+    // 而宿主带着 lang（上面那行）——overlay 打开了却看不见，滚轮与按键照样被吞，
+    // 页面看上去就是卡死。inline !important 只输给 user 来源的 !important，
+    // 那一种由 open() 的可见性检查兜底。不能只给 all 加：同一 inline 里 all 的
+    // !important 会把后面没带的 position、inset 全部盖回初始值。
+    host.style.cssText = [
+      'all:initial',
+      'position:fixed',
+      'inset:0',
+      'z-index:2147483647',
+      'overflow:hidden',
+      'contain:layout style',
+      'font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif',
+      'color:#f5f5f5',
+    ]
+      .map((d) => d + '!important')
+      .join(';');
 
     shadow = host.attachShadow({ mode: 'open' });
 
@@ -673,6 +688,14 @@ button:hover{background:rgba(63,63,70,.9)}
 
     requestAnimationFrame(() => {
       if (state !== 'open') return;
+      // 看不见就不接管（cases 013）：拦着滚轮与按键却看不见，页面就是卡死，比漏开一张图贵得多。
+      // 放在下一帧：页面脚本（MutationObserver 是微任务）与样式都已落定。
+      // 拦得住宿主的只剩 user 来源的 !important（广告拦截的元素隐藏规则走的就是它），
+      // 以及页面脚本直接改写宿主。两种都不是我们能赢的，所以不硬顶，退场。
+      if (!host.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || !host.offsetWidth) {
+        Closer.state.unseen = true;
+        return close(true);
+      }
       view.s = clampS(fit);
       view.tx = 0;
       view.ty = 0;
