@@ -3,21 +3,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Closer — Click any image to view it full size</title>
-<meta name="description" content="A Chrome extension that opens the image you click at its real size — and knows which images are worth opening. No tracking, no build step, MIT.">
+<meta name="description" content="A Chrome extension: click an image on any web page to see it full size. Skips icons, avatars and linked images. Collects no data. MIT licensed.">
 <meta property="og:title" content="Closer — Click any image to view it full size">
-<meta property="og:description" content="Closer knows which images are worth opening. No tracking, no build step, MIT.">
+<meta property="og:description" content="Click an image on any web page to see it full size. Collects no data.">
 <meta property="og:image" content="https://shiroixw.github.io/Closer/assets/hero.jpg">
 <meta name="color-scheme" content="dark">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect x='4' y='4' width='120' height='120' rx='30' fill='%23121214'/%3E%3Cg fill='%23f2f2f5'%3E%3Cpath fill-rule='evenodd' d='M38 24h52a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H38a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14zm7 14a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V45a7 7 0 0 0-7-7z'/%3E%3Ccircle cx='52' cy='54' r='7'/%3E%3Cpath d='M36 92 64 56 92 92z'/%3E%3C/g%3E%3C/svg%3E">
 
 <!--
   Closer 的官网。和扩展守同一套规矩：
-  · 手写、单文件、无构建、无框架（宪法第五条）——View source 看到的就是写出来的版本；
-  · 不引任何第三方资源：无字体 CDN、无统计、无外链脚本（第四条）——这一页自己就不该成为隐私政策的反例；
+  · 手写、单文件、无构建、无框架（宪法第五条）。View source 看到的就是写出来的版本。
+  · 不引任何第三方资源：无字体 CDN、无统计、无外链脚本（第四条）。这一页自己不能成为隐私政策的反例。
   · 中英两种写在同一份 DOM 里，按 <html lang> 只显示一种。默认按浏览器语言选，页头有切换（D40）。
     没有 JS 时显示英文，切换按钮也不出现。
   页面上的读数（1600 × 1000、JPEG · 203 KB）就是 assets/hero.jpg 的真实值，
   「显示 W × H」与「在 … 上暂停」由下面的脚本按 Closer 的同一算法现场算出。
+
+  文案口径：短句、说具体的事，不写口号。判断清单与快捷键是 detect.js 的 judge() 与
+  overlay.js 的 onKey 的转述，改判据或键位时这里要跟着改（没有自动检查）。
 -->
 
 <link rel="alternate" hreflang="en" href="https://shiroixw.github.io/Closer/?lang=en">
@@ -26,8 +29,8 @@
 
 <script>
   // 语言的来源，先到先得：
-  //   1. 链接里的 ?lang=zh / ?lang=en —— 分享出去的链接要让对方看到同一种语言；
-  //   2. 访客上次在这里按过的切换（只存在这台机器的 localStorage，不离开浏览器）；
+  //   1. 链接里的 ?lang=zh / ?lang=en：分享出去的链接要让对方看到同一种语言；
+  //   2. 访客上次按过的切换（只存在这台机器的 localStorage，隐私政策页共用同一个 key）；
   //   3. 浏览器语言，口径与扩展的 _locales 一致：只有简体中文落到 zh-CN，其余（含 zh-TW）回英文。
   // 写在 <head> 里同步执行：等到 DOMContentLoaded 再切，首屏会先闪一下另一种语言。
   window.CLOSER_LANG = (() => {
@@ -80,6 +83,11 @@
   a { color: inherit; }
   code, kbd { font-family: var(--mono); }
   code { font-size: .88em; color: #d4d4d8; background: #1c1c20; padding: 1px 6px; border-radius: 5px; }
+  kbd {
+    display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px;
+    font-size: 12px; color: var(--text); background: #18181b;
+    border: 1px solid #2f2f35; border-bottom-width: 2px; border-radius: 6px;
+  }
 
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
@@ -96,10 +104,9 @@
   .top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; text-decoration: none; letter-spacing: -.01em; }
   .brand svg { width: 28px; height: 28px; display: block; }
-  .nav { display: flex; gap: 22px; font-size: 14px; }
+  .nav { display: flex; align-items: center; gap: 22px; font-size: 14px; }
   .nav a { color: var(--dim); text-decoration: none; transition: color .15s ease; }
   .nav a:hover { color: var(--text); }
-  .nav { align-items: center; }
 
   /* 语言切换：两档并排，当前那档亮，整颗按钮点一下就换到另一档 */
   .lang {
@@ -124,7 +131,7 @@
     font-size: clamp(38px, 6.2vw, 68px); line-height: 1.06; letter-spacing: -.035em; font-weight: 650;
   }
   html[lang="zh-CN"] h1 { letter-spacing: -.01em; line-height: 1.15; }
-  .lede { margin: 24px auto 0; max-width: 620px; font-size: clamp(17px, 2vw, 20px); color: var(--dim); }
+  .lede { margin: 24px auto 0; max-width: 600px; font-size: clamp(17px, 2vw, 19px); color: var(--dim); }
   .cta { margin-top: 34px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
@@ -138,7 +145,6 @@
   .btn.primary { background: var(--accent); color: #0b0b0c; border-color: var(--accent); }
   .btn.primary:hover { background: #fff; }
   .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .soon { margin-top: 14px; font-size: 13px; color: var(--faint); }
   .facts { margin: 26px 0 0; padding: 0; list-style: none; display: flex; gap: 8px 22px; justify-content: center; flex-wrap: wrap; font-size: 13.5px; color: var(--dim); }
   .facts li::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); margin-right: 8px; vertical-align: middle; position: relative; top: -1px; }
 
@@ -180,7 +186,7 @@
   .viewer .sub { color: #a1a1aa; font-size: 12px; margin-top: 2px; }
   .viewer hr { border: 0; border-top: 1px solid rgba(255, 255, 255, .1); margin: 10px 0 8px; }
   .viewer .pause { color: #a1a1aa; font-size: 12px; }
-  .caption { margin: 16px auto 0; max-width: 640px; text-align: center; font-size: 13.5px; color: var(--faint); }
+  .caption { margin: 16px auto 0; text-align: center; font-size: 13.5px; color: var(--faint); }
 
   /* ── 通用区块 ─────────────────────────── */
   section { padding: 104px 0 0; scroll-margin-top: 40px; }
@@ -188,61 +194,48 @@
   html[lang="zh-CN"] .kicker { letter-spacing: .12em; }
   h2 { margin: 0; font-size: clamp(28px, 3.6vw, 40px); line-height: 1.15; letter-spacing: -.025em; font-weight: 650; max-width: 760px; }
   html[lang="zh-CN"] h2 { letter-spacing: 0; line-height: 1.3; }
-  .intro { margin: 18px 0 0; max-width: 680px; color: var(--dim); font-size: 17px; }
+  .intro { margin: 16px 0 0; max-width: 640px; color: var(--dim); font-size: 17px; }
 
-  /* 判断：会开 / 不碰 */
-  .verdict { margin-top: 44px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 26px 28px; }
-  .card h3 { margin: 0 0 14px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 26px; }
+  .card h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+
+  /* 会打开 / 不会打开 */
+  .verdict { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; }
   .dot svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .dot.yes { background: rgba(74, 222, 128, .12); color: var(--ok); }
   .dot.no { background: rgba(248, 113, 113, .12); color: var(--no); }
-  .card ul { margin: 0; padding: 0; list-style: none; }
-  .card li { padding: 9px 0; border-top: 1px solid #1e1e22; color: #d4d4d8; font-size: 15px; }
-  .card li:first-child { border-top: 0; padding-top: 0; }
-  .card li small { display: block; color: var(--faint); font-size: 13px; margin-top: 2px; }
-  .rule { margin-top: 20px; padding: 22px 28px; border-radius: 16px; border: 1px dashed #34343a; color: var(--dim); font-size: 15.5px; }
-  .rule strong { color: var(--text); font-weight: 600; }
+  .verdict ul { margin: 0; padding: 0; list-style: none; }
+  .verdict li { padding: 9px 0; border-top: 1px solid #1e1e22; color: #d4d4d8; font-size: 15px; }
+  .verdict li:first-child { border-top: 0; padding-top: 0; }
+  .note { margin: 18px 0 0; color: var(--dim); font-size: 15px; }
 
-  /* 点下去之后：六格 */
-  .grid { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
-  .cell { background: var(--bg); padding: 28px 26px 30px; }
-  .cell .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #17171a; border: 1px solid var(--line); margin-bottom: 18px; }
+  /* 查看器：四格 + 一行快捷键 */
+  .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .cell { background: var(--bg); padding: 26px 24px 28px; }
+  .cell .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #17171a; border: 1px solid var(--line); margin-bottom: 16px; }
   .cell .ic svg { width: 18px; height: 18px; fill: none; stroke: #e4e4e7; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .cell h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
   .cell p { margin: 0; color: var(--dim); font-size: 14.5px; }
-
-  /* 键位 */
-  .keys { margin-top: 44px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 48px; }
-  .keys div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #1e1e22; font-size: 15px; color: #d4d4d8; }
-  .keys span:last-child { display: flex; gap: 5px; flex: none; }
-  kbd {
-    display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px;
-    font-size: 12.5px; color: var(--text); background: #18181b;
-    border: 1px solid #2f2f35; border-bottom-width: 2px; border-radius: 7px;
-  }
-  .keys em { font-style: normal; color: var(--faint); font-size: 13px; align-self: center; }
+  .keys { margin: 22px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-size: 14px; color: var(--dim); }
+  .keys > span { display: inline-flex; align-items: center; gap: 6px; }
+  .keys .label { color: var(--faint); }
 
   /* 隐私 */
-  .privacy { margin-top: 44px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-  .privacy .card p { margin: 6px 0 0; color: var(--dim); font-size: 14.5px; }
+  .privacy { margin-top: 40px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   .privacy .card h3 { margin: 0; }
-  .links { margin-top: 26px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 15px; }
+  .privacy .card p { margin: 6px 0 0; color: var(--dim); font-size: 14.5px; }
+  .links { margin-top: 24px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 15px; }
   .links a { color: var(--text); text-decoration: none; border-bottom: 1px solid #3f3f46; padding-bottom: 1px; transition: border-color .15s ease; }
   .links a:hover { border-bottom-color: var(--text); }
 
   /* 安装 */
-  .steps { margin: 44px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 22px; font-size: 14.5px; color: var(--dim); }
-  .steps li::before { content: counter(s); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #0b0b0c; font-weight: 650; font-size: 14px; margin-bottom: 16px; }
+  .steps { margin: 40px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; font-size: 14.5px; color: var(--dim); }
+  .steps li::before { content: counter(s); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #0b0b0c; font-weight: 650; font-size: 14px; margin-bottom: 14px; }
   .steps strong { display: block; color: var(--text); font-weight: 600; font-size: 15.5px; margin-bottom: 4px; }
-  .aside { margin-top: 20px; color: var(--faint); font-size: 14px; }
-
-  .authors { margin-top: 56px; padding: 26px 28px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
-  .authors h3 { margin: 0; font-size: 16px; font-weight: 600; }
-  .authors p { margin: 0 0 8px; color: var(--dim); font-size: 14.5px; }
-  .authors p:last-child { margin: 0; }
+  .aside { margin-top: 18px; color: var(--faint); font-size: 14px; }
+  .aside + .aside { margin-top: 6px; }
 
   /* 页脚 */
   footer { margin-top: 120px; border-top: 1px solid var(--line); padding: 30px 0 48px; color: var(--faint); font-size: 13.5px; }
@@ -252,15 +245,14 @@
   footer a:hover { color: var(--text); }
 
   @media (max-width: 860px) {
-    .grid { grid-template-columns: 1fr 1fr; }
-    .steps { grid-template-columns: 1fr 1fr; }
-    .authors { grid-template-columns: 1fr; gap: 10px; }
+    .grid, .steps { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px) {
+    .nav { gap: 16px; }
     .nav a.opt { display: none; }
     .hero { padding-top: 56px; }
     section { padding-top: 80px; }
-    .verdict, .grid, .keys, .privacy, .steps { grid-template-columns: 1fr; }
+    .verdict, .grid, .privacy, .steps { grid-template-columns: 1fr; }
     .viewer { aspect-ratio: 4 / 3; }
     .viewer .photo { width: 92%; }
     .viewer .panel { width: 196px; padding: 10px 12px; }
@@ -276,7 +268,7 @@
       Closer
     </a>
     <nav class="nav">
-      <a class="opt" href="#judge"><span lang="en">How it decides</span><span lang="zh-CN">怎么判断</span></a>
+      <a class="opt" href="#judge"><span lang="en">What opens</span><span lang="zh-CN">打开哪些图</span></a>
       <a class="opt" href="#install"><span lang="en">Install</span><span lang="zh-CN">安装</span></a>
       <a href="privacy.html"><span lang="en">Privacy</span><span lang="zh-CN">隐私</span></a>
       <a href="https://github.com/shiroixw/Closer">GitHub</a>
@@ -289,14 +281,14 @@
 <main>
 
 <div class="wrap hero">
-  <span class="eyebrow"><span lang="en">A Chrome extension · v0.1</span><span lang="zh-CN">一个 Chrome 扩展 · v0.1</span></span>
+  <span class="eyebrow"><span lang="en">Chrome extension · v0.1</span><span lang="zh-CN">Chrome 扩展 · v0.1</span></span>
   <h1>
-    <span lang="en">Click any image.<br>See it at its real size.</span>
-    <span lang="zh-CN">点任意一张图，<br>按原尺寸看清它。</span>
+    <span lang="en">Click an image.<br>See it full size.</span>
+    <span lang="zh-CN">点一下图片，<br>看清原图。</span>
   </h1>
   <p class="lede">
-    <span lang="en">Closer knows which images are worth opening — and stays out of the way of the ones that aren't.</span>
-    <span lang="zh-CN">Closer 知道哪些图值得打开，也知道哪些图不该碰。</span>
+    <span lang="en">Most images on the web are shown smaller than they are. Click one and Closer opens it full size, right on the page. Icons, avatars and linked images are left alone.</span>
+    <span lang="zh-CN">网页上的图片大多被缩小了。点一下，Closer 就在当前页面打开原图。图标、头像和带链接的图，它不会碰。</span>
   </p>
   <div class="cta">
     <a class="btn primary" href="#install">
@@ -305,15 +297,13 @@
     </a>
     <a class="btn" href="https://github.com/shiroixw/Closer">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7-5 5 5 5"/><path d="m15 7 5 5-5 5"/></svg>
-      <span lang="en">Read the source</span><span lang="zh-CN">读源码</span>
+      <span lang="en">Source code</span><span lang="zh-CN">源码</span>
     </a>
   </div>
-  <p class="soon"><span lang="en">Chrome Web Store listing is on its way. Until then, it loads from source in under a minute.</span><span lang="zh-CN">Chrome 应用商店正在上架。在那之前，从源码装上它不到一分钟。</span></p>
   <ul class="facts">
-    <li><span lang="en">No tracking</span><span lang="zh-CN">无埋点</span></li>
-    <li><span lang="en">No account</span><span lang="zh-CN">无账号</span></li>
-    <li><span lang="en">Readable, unminified source</span><span lang="zh-CN">源码不压缩、可读</span></li>
-    <li><span lang="en">Free, MIT</span><span lang="zh-CN">免费，MIT</span></li>
+    <li><span lang="en">Collects no data</span><span lang="zh-CN">不收集数据</span></li>
+    <li><span lang="en">No sign-up</span><span lang="zh-CN">不用注册</span></li>
+    <li><span lang="en">Open source, MIT</span><span lang="zh-CN">开源，MIT 许可</span></li>
   </ul>
 
   <figure class="demo">
@@ -337,57 +327,48 @@
       </div>
     </div>
     <figcaption class="caption">
-      <span lang="en">The viewer, drawn with the same styles it ships with. Already installed? Click the photo — Closer will tell you the same numbers.</span>
-      <span lang="zh-CN">按扩展里同一套样式画出来的查看器。已经装了？直接点这张照片——Closer 报出来的会是同一组数字。</span>
+      <span lang="en">Already have Closer? Click the photo and compare.</span>
+      <span lang="zh-CN">已经装了 Closer？点这张照片对比一下。</span>
     </figcaption>
   </figure>
 </div>
 
 <section id="judge">
   <div class="wrap">
-    <p class="kicker"><span lang="en">The judge</span><span lang="zh-CN">判断器</span></p>
+    <p class="kicker"><span lang="en">What opens</span><span lang="zh-CN">打开哪些图</span></p>
     <h2>
-      <span lang="en">The viewer is the easy half. Knowing which image you meant is the product.</span>
-      <span lang="zh-CN">看图器是容易的那一半。知道你点的是哪一张，才是产品本身。</span>
+      <span lang="en">Only the ones worth a closer look</span>
+      <span lang="zh-CN">只打开值得放大的图</span>
     </h2>
     <p class="intro">
-      <span lang="en">Your browser already has an image viewer. So do a dozen extensions. What none of them has is judgment: on a page Closer has never seen, facing forty images, deciding which one you pointed at — and staying quiet when the answer isn't clear.</span>
-      <span lang="zh-CN">浏览器自带一个看图器，十几个扩展各有一个。它们缺的是判断力：在一个从没见过的页面上，面对四十张图，判断你点的是哪一张——拿不准的时候，就别出声。</span>
+      <span lang="en">A page can have dozens of images. Most of them aren't meant to be opened.</span>
+      <span lang="zh-CN">一个页面上可能有几十张图，大部分并不需要放大看。</span>
     </p>
 
     <div class="verdict">
       <div class="card">
         <h3><span class="dot yes"><svg viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></svg></span><span lang="en">Opens</span><span lang="zh-CN">会打开</span></h3>
         <ul>
-          <li><span lang="en">Photos drawn smaller than they really are</span><span lang="zh-CN">被缩小显示的照片</span>
-            <small lang="en">a 1600 × 1000 photo shown at 980 × 613 in an article</small><small lang="zh-CN">文章里一张 1600 × 1000 的图被画成 980 × 613</small></li>
-          <li><span lang="en">Screenshots squeezed into a column</span><span lang="zh-CN">被压进一栏的截图</span>
-            <small lang="en">docs, issues, changelogs, forum posts</small><small lang="zh-CN">文档、issue、更新日志、论坛帖子</small></li>
-          <li><span lang="en">Images that link to themselves</span><span lang="zh-CN">链接指向图片本身的图</span>
-            <small lang="en">better than a bare jump to the file</small><small lang="zh-CN">比直接跳到图片文件更好</small></li>
+          <li><span lang="en">Photos shrunk to fit an article</span><span lang="zh-CN">文章里被缩小的照片</span></li>
+          <li><span lang="en">Screenshots and charts</span><span lang="zh-CN">截图、图表</span></li>
+          <li><span lang="en">Images that link to their own file</span><span lang="zh-CN">链接指向图片本身的图</span></li>
         </ul>
       </div>
       <div class="card">
-        <h3><span class="dot no"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></span><span lang="en">Leaves alone</span><span lang="zh-CN">不会碰</span></h3>
+        <h3><span class="dot no"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></span><span lang="en">Leaves alone</span><span lang="zh-CN">不会打开</span></h3>
         <ul>
-          <li><span lang="en">Icons, logos, banners, dividers</span><span lang="zh-CN">图标、logo、横幅、分割线</span>
-            <small lang="en">too small to gain anything from opening</small><small lang="zh-CN">太小，打开也看不到更多</small></li>
-          <li><span lang="en">Avatars and QR codes</span><span lang="zh-CN">头像和二维码</span>
-            <small lang="en">you want to scan it or see the person, not the file</small><small lang="zh-CN">你想扫它、或看这个人，不是看这张图</small></li>
-          <li><span lang="en">Images inside links, buttons and clickable cards</span><span lang="zh-CN">链接、按钮、可点卡片里的图</span>
-            <small lang="en">the click belongs to them</small><small lang="zh-CN">这次点击属于它们</small></li>
-          <li><span lang="en">Background layers behind the content</span><span lang="zh-CN">垫在内容后面的背景层</span>
-            <small lang="en">full-width headers, hero backdrops</small><small lang="zh-CN">通栏页头、首屏背景</small></li>
-          <li><span lang="en">Anything the site opens with its own viewer</span><span lang="zh-CN">站点自己会用查看器打开的图</span>
-            <small lang="en">if the page reacts to the click, Closer steps aside — no double viewers</small><small lang="zh-CN">页面对这次点击有反应，Closer 就退场——不会叠出两层</small></li>
+          <li><span lang="en">Icons, logos and banners</span><span lang="zh-CN">图标、logo、横幅</span></li>
+          <li><span lang="en">Avatars and QR codes</span><span lang="zh-CN">头像、二维码</span></li>
+          <li><span lang="en">Images inside links, buttons and clickable cards</span><span lang="zh-CN">链接、按钮、可点击卡片里的图</span></li>
+          <li><span lang="en">Page backgrounds</span><span lang="zh-CN">网页背景图</span></li>
+          <li><span lang="en">Images the site already opens in its own viewer</span><span lang="zh-CN">网站自己会放大的图</span></li>
         </ul>
       </div>
     </div>
-
-    <div class="rule">
-      <span lang="en"><strong>When in doubt, it doesn't open.</strong> Missing an image costs you one right-click. Hijacking a click costs you the page you were on — and that is how extensions get uninstalled.</span>
-      <span lang="zh-CN"><strong>拿不准，就不开。</strong>漏开一张图，代价是一次右键；误接管一次点击，代价是你正在看的那个页面——扩展就是这样被卸载的。</span>
-    </div>
+    <p class="note">
+      <span lang="en">When it isn't sure, it does nothing. You can still right-click an image it skipped.</span>
+      <span lang="zh-CN">拿不准的时候它就不打开。漏掉的图，右键仍然可以照常打开。</span>
+    </p>
   </div>
 </section>
 
@@ -395,55 +376,48 @@
   <div class="wrap">
     <p class="kicker"><span lang="en">The viewer</span><span lang="zh-CN">查看器</span></p>
     <h2>
-      <span lang="en">One image, out of the layout for a moment. Then the page, exactly as it was.</span>
-      <span lang="zh-CN">把这一张图从版面里请出来片刻。关掉之后，页面原封不动。</span>
+      <span lang="en">Opens on the page. Close it and nothing has moved.</span>
+      <span lang="zh-CN">在当前页面打开，关掉后页面不变</span>
     </h2>
+    <p class="intro">
+      <span lang="en">No new tab. Press Esc and you're back where you were, at the same scroll position.</span>
+      <span lang="zh-CN">不开新标签页。按 Esc 关闭，还停在原来看到的位置。</span>
+    </p>
 
     <div class="grid">
       <div class="cell">
-        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></div>
-        <h3><span lang="en">Grows out of its thumbnail</span><span lang="zh-CN">从缩略图里就地展开</span></h3>
-        <p><span lang="en">No new tab, no navigation. Scroll to zoom around the pointer, drag to pan, double-click for 1:1.</span><span lang="zh-CN">不开新标签，不跳页面。滚轮以指针为中心缩放，拖拽平移，双击切到 1:1。</span></p>
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4M11 8.5v5M8.5 11h5"/></svg></div>
+        <h3><span lang="en">Zoom and pan</span><span lang="zh-CN">缩放和拖动</span></h3>
+        <p><span lang="en">Scroll to zoom, drag to move, double-click for 1:1.</span><span lang="zh-CN">滚轮缩放，按住拖动，双击切到 1:1。</span></p>
       </div>
       <div class="cell">
         <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg></div>
-        <h3><span lang="en">The image explains itself</span><span lang="zh-CN">一张图的底细</span></h3>
-        <p><span lang="en">Press <kbd>·</kbd> or <kbd>I</kbd>: original pixels against the size the page drew it at, aspect ratio, megapixels, format, file size.</span><span lang="zh-CN">按 <kbd>·</kbd> 或 <kbd>I</kbd>：原始像素与页面实际绘制尺寸之差、宽高比、百万像素、格式、文件大小。</span></p>
+        <h3><span lang="en">Image info</span><span lang="zh-CN">图片信息</span></h3>
+        <p><span lang="en">Real size, displayed size, format and file size.</span><span lang="zh-CN">原始尺寸、显示尺寸、格式和文件大小。</span></p>
       </div>
       <div class="cell">
         <div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></div>
-        <h3><span lang="en">Copy, or save the original</span><span lang="zh-CN">复制，或保存原图</span></h3>
-        <p><span lang="en">Copy straight into any app, or save the original file — byte for byte what the site serves. No downloads permission needed.</span><span lang="zh-CN">复制后直接粘进任何应用；保存拿到的是原始文件，与站点提供的逐字节一致。不需要下载权限。</span></p>
+        <h3><span lang="en">Copy and save</span><span lang="zh-CN">复制和保存</span></h3>
+        <p><span lang="en">Copy the image, or save the original file.</span><span lang="zh-CN">复制图片，或者保存原文件。</span></p>
       </div>
       <div class="cell">
         <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16M12 4v16"/></svg></div>
-        <h3><span lang="en">Three backdrops</span><span lang="zh-CN">三种背板</span></h3>
-        <p><span lang="en">Dark, light, or a checkerboard for transparent PNGs. Press <kbd>B</kbd>; it remembers.</span><span lang="zh-CN">深色、浅色，或给透明 PNG 用的棋盘格。按 <kbd>B</kbd> 切换，会记住。</span></p>
-      </div>
-      <div class="cell">
-        <div class="ic"><svg viewBox="0 0 24 24"><path d="M14 5h5v5"/><path d="M19 5l-7 7"/><path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/></svg></div>
-        <h3><span lang="en">Steps aside for the site</span><span lang="zh-CN">给站点让位</span></h3>
-        <p><span lang="en">If the page answers the click — its own lightbox, a zoom, a link — Closer leaves without a trace.</span><span lang="zh-CN">页面若接住了这次点击——自己的灯箱、放大镜、跳转——Closer 不留痕迹地退场。</span></p>
-      </div>
-      <div class="cell">
-        <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></div>
-        <h3><span lang="en">The page, untouched</span><span lang="zh-CN">页面原样奉还</span></h3>
-        <p><span lang="en">Esc closes. Scroll position, history, the DOM itself — byte-for-byte what they were. Pause any site from the info panel.</span><span lang="zh-CN">Esc 关闭。滚动位置、历史记录、DOM 本身，逐字节还原。任何站点都能在信息面板里一键暂停。</span></p>
+        <h3><span lang="en">Three backdrops</span><span lang="zh-CN">三种背景</span></h3>
+        <p><span lang="en">Dark, light, or a checkerboard for transparent images.</span><span lang="zh-CN">深色、浅色，以及看透明图用的棋盘格。</span></p>
       </div>
     </div>
 
-    <div class="keys" aria-label="Keyboard shortcuts">
-      <div><span lang="en">Close</span><span lang="zh-CN">关闭</span><span><kbd>Esc</kbd></span></div>
-      <div><span lang="en">Follow the link the click would have taken</span><span lang="zh-CN">走原本这次点击该走的链接</span><span><kbd>Enter</kbd></span></div>
-      <div><span lang="en">Image info</span><span lang="zh-CN">图片详情</span><span><kbd>·</kbd><kbd>I</kbd></span></div>
-      <div><span lang="en">Copy image (<kbd>⇧</kbd> copies its address)</span><span lang="zh-CN">复制图片（加 <kbd>⇧</kbd> 复制地址）</span><span><kbd>⌘/Ctrl</kbd><kbd>C</kbd></span></div>
-      <div><span lang="en">Save the original</span><span lang="zh-CN">保存原图</span><span><kbd>⌘/Ctrl</kbd><kbd>S</kbd></span></div>
-      <div><span lang="en">Fit to window · actual size</span><span lang="zh-CN">适应窗口 · 原始尺寸</span><span><kbd>0</kbd><kbd>1</kbd></span></div>
-      <div><span lang="en">Zoom in · out</span><span lang="zh-CN">放大 · 缩小</span><span><kbd>+</kbd><kbd>−</kbd></span></div>
-      <div><span lang="en">Rotate · flip</span><span lang="zh-CN">旋转 · 镜像</span><span><kbd>R</kbd><kbd>F</kbd></span></div>
-      <div><span lang="en">Next backdrop</span><span lang="zh-CN">切换背板</span><span><kbd>B</kbd></span></div>
-      <div><span lang="en">Fit ↔ 1:1</span><span lang="zh-CN">适应 ↔ 1:1</span><span><em lang="en">double-click</em><em lang="zh-CN">双击</em></span></div>
-    </div>
+    <p class="keys">
+      <span class="label" lang="en">Shortcuts</span><span class="label" lang="zh-CN">快捷键</span>
+      <span><kbd>Esc</kbd><span lang="en">close</span><span lang="zh-CN">关闭</span></span>
+      <span><kbd>·</kbd><kbd>I</kbd><span lang="en">info</span><span lang="zh-CN">信息</span></span>
+      <span><kbd>⌘/Ctrl C</kbd><span lang="en">copy</span><span lang="zh-CN">复制</span></span>
+      <span><kbd>⌘/Ctrl S</kbd><span lang="en">save</span><span lang="zh-CN">保存</span></span>
+      <span><kbd>0</kbd><kbd>1</kbd><span lang="en">fit / 1:1</span><span lang="zh-CN">适应窗口 / 1:1</span></span>
+      <span><kbd>+</kbd><kbd>−</kbd><span lang="en">zoom</span><span lang="zh-CN">缩放</span></span>
+      <span><kbd>R</kbd><kbd>F</kbd><span lang="en">rotate / flip</span><span lang="zh-CN">旋转 / 镜像</span></span>
+      <span><kbd>B</kbd><span lang="en">backdrop</span><span lang="zh-CN">背景</span></span>
+    </p>
   </div>
 </section>
 
@@ -451,35 +425,34 @@
   <div class="wrap">
     <p class="kicker"><span lang="en">Privacy</span><span lang="zh-CN">隐私</span></p>
     <h2>
-      <span lang="en">No tracking — by construction, not by promise.</span>
-      <span lang="zh-CN">不追踪你——靠构造，不靠声明。</span>
+      <span lang="en">It doesn't collect your data</span>
+      <span lang="zh-CN">不收集你的任何数据</span>
     </h2>
     <p class="intro">
-      <span lang="en">Closer asks for the biggest permission an extension can: to run on every site you visit. The source code is the receipt. It ships exactly as written — no bundler, no minifier, nothing generated.</span>
-      <span lang="zh-CN">Closer 索要的是一个扩展能提出的最大请求：在你访问的每个网站上运行。源码就是收据——它原样发布，不打包、不压缩、没有任何生成出来的代码。</span>
+      <span lang="en">Closer needs access to every site you visit, so here is what it does with it.</span>
+      <span lang="zh-CN">Closer 需要在你访问的所有网站上运行，所以把它做什么说清楚。</span>
     </p>
     <div class="privacy">
       <div class="card">
-        <h3><span lang="en">Nothing leaves your machine</span><span lang="zh-CN">什么都不离开你的电脑</span></h3>
-        <p><span lang="en">No analytics, no telemetry, no crash reports, no remote config, no account, no server of its own.</span><span lang="zh-CN">无统计、无遥测、无崩溃上报、无远程配置、无账号，也没有自己的服务器。</span></p>
+        <h3><span lang="en">No tracking</span><span lang="zh-CN">没有统计和上报</span></h3>
+        <p><span lang="en">No analytics, no crash reports, no account, no server.</span><span lang="zh-CN">没有数据统计，没有崩溃上报，没有账号，也没有服务器。</span></p>
       </div>
       <div class="card">
-        <h3><span lang="en">Exactly one kind of request</span><span lang="zh-CN">只有一种网络请求</span></h3>
-        <p><span lang="en">The bytes of the image you're looking at, to report its real file size. Measured in memory, then dropped. Already cached? Zero requests.</span><span lang="zh-CN">取回你正在看的那张图的字节，用来报告真实文件大小。在内存里量完即丢。浏览器已缓存时，零请求。</span></p>
+        <h3><span lang="en">One kind of request</span><span lang="zh-CN">只请求你正在看的图</span></h3>
+        <p><span lang="en">It fetches the image you opened to read its file size. Nothing else.</span><span lang="zh-CN">为了显示文件大小，它会读取你打开的那张图，不请求别的东西。</span></p>
       </div>
       <div class="card">
-        <h3><span lang="en">Doesn't read the page</span><span lang="zh-CN">不读页面</span></h3>
-        <p><span lang="en">Only the image you clicked and its ancestors. Not the text, not your forms, not your history, not your cookies.</span><span lang="zh-CN">只看被点的那张图和它的祖先链。不读正文、表单、浏览历史，也不读 Cookie。</span></p>
+        <h3><span lang="en">Doesn't read the page</span><span lang="zh-CN">不读网页内容</span></h3>
+        <p><span lang="en">Only the image you click. Not the text, forms, history or cookies.</span><span lang="zh-CN">只看你点的那张图，不读正文、表单、浏览记录和 Cookie。</span></p>
       </div>
       <div class="card">
-        <h3><span lang="en">Off until you say so</span><span lang="zh-CN">你点头之前，它什么都不做</span></h3>
-        <p><span lang="en">Site access is optional and requested from a button you press. Revoke it any time, from the welcome page, the popup, or <code>chrome://extensions</code>.</span><span lang="zh-CN">站点访问是可选权限，只在你按下按钮时申请。随时可在欢迎页、popup 或 <code>chrome://extensions</code> 里撤销。</span></p>
+        <h3><span lang="en">Off until you allow it</span><span lang="zh-CN">你同意后才开始工作</span></h3>
+        <p><span lang="en">After installing, it waits for your OK. You can take it back any time.</span><span lang="zh-CN">装好后要你点一下授权才会生效，随时可以撤销。</span></p>
       </div>
     </div>
     <div class="links">
       <a href="privacy.html"><span lang="en">Privacy policy</span><span lang="zh-CN">隐私政策</span> →</a>
-      <a href="https://github.com/shiroixw/Closer/blob/main/CONSTITUTION.md"><span lang="en">The constitution: ten rules that end arguments</span><span lang="zh-CN">宪法：用来结束争论的十条规则</span> →</a>
-      <a href="https://github.com/shiroixw/Closer/blob/main/docs/cases.md"><span lang="en">Every real misjudgment, including the unfixable ones</span><span lang="zh-CN">每一次真实误判，包括修不了的</span> →</a>
+      <a href="https://github.com/shiroixw/Closer"><span lang="en">Source code (not minified, easy to read)</span><span lang="zh-CN">源码（没有压缩，可以直接读）</span> →</a>
     </div>
   </div>
 </section>
@@ -488,44 +461,40 @@
   <div class="wrap">
     <p class="kicker"><span lang="en">Install</span><span lang="zh-CN">安装</span></p>
     <h2>
-      <span lang="en">Four steps, under a minute.</span>
-      <span lang="zh-CN">四步，不到一分钟。</span>
+      <span lang="en">Four steps</span>
+      <span lang="zh-CN">四步装好</span>
     </h2>
     <p class="intro">
-      <span lang="en">There's no build step, so the repository is the extension. When the Chrome Web Store listing goes live, it will be a single click.</span>
-      <span lang="zh-CN">没有构建步骤，仓库本身就是扩展。等 Chrome 应用商店上架后，就只剩一次点击。</span>
+      <span lang="en">It isn't on the Chrome Web Store yet, so for now you load it from the source.</span>
+      <span lang="zh-CN">还没上架 Chrome 应用商店，目前需要从源码加载。</span>
     </p>
     <ol class="steps">
       <li>
-        <strong lang="en">Get the source</strong><strong lang="zh-CN">拿到源码</strong>
-        <span lang="en"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">Download the ZIP</a> and unzip it, or <code>git clone</code> the repository.</span>
-        <span lang="zh-CN"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">下载 ZIP</a> 并解压，或者 <code>git clone</code> 仓库。</span>
+        <strong lang="en">Download</strong><strong lang="zh-CN">下载</strong>
+        <span lang="en"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">Download the ZIP</a> and unzip it.</span>
+        <span lang="zh-CN"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">下载 ZIP</a> 并解压。</span>
       </li>
       <li>
         <strong lang="en">Open extensions</strong><strong lang="zh-CN">打开扩展页</strong>
-        <span lang="en">Go to <code>chrome://extensions</code> and turn on <em>Developer mode</em>, top right.</span>
-        <span lang="zh-CN">地址栏输入 <code>chrome://extensions</code>，打开右上角的「开发者模式」。</span>
+        <span lang="en">Go to <code>chrome://extensions</code> and turn on Developer mode.</span>
+        <span lang="zh-CN">打开 <code>chrome://extensions</code>，开启右上角的「开发者模式」。</span>
       </li>
       <li>
         <strong lang="en">Load it</strong><strong lang="zh-CN">加载</strong>
-        <span lang="en">Click <em>Load unpacked</em> and pick the folder that contains <code>manifest.json</code>.</span>
-        <span lang="zh-CN">点「加载已解压的扩展程序」，选中包含 <code>manifest.json</code> 的那个文件夹。</span>
+        <span lang="en">Click Load unpacked and choose the unzipped folder.</span>
+        <span lang="zh-CN">点「加载已解压的扩展程序」，选择解压出来的文件夹。</span>
       </li>
       <li>
         <strong lang="en">Allow it</strong><strong lang="zh-CN">授权</strong>
-        <span lang="en">A welcome page opens. Press <em>Allow on all sites</em>. That's the only question it will ever ask.</span>
-        <span lang="zh-CN">会自动打开欢迎页，按「在所有站点上允许」。这是它唯一会问你的问题。</span>
+        <span lang="en">On the welcome page that opens, click Allow on all sites.</span>
+        <span lang="zh-CN">在自动打开的欢迎页里，点「在所有站点上允许」。</span>
       </li>
     </ol>
-    <p class="aside"><span lang="en">Chrome 110 or later. Also works in Chromium-based browsers that load Chrome extensions.</span><span lang="zh-CN">需要 Chrome 110 或更高版本；能加载 Chrome 扩展的 Chromium 系浏览器同样可用。</span></p>
-
-    <div class="authors">
-      <h3><span lang="en">For site authors</span><span lang="zh-CN">写给网站作者</span></h3>
-      <div>
-        <p><span lang="en">Add <code>data-closer-ignore</code> to an image or any of its containers and Closer will never touch it.</span><span lang="zh-CN">给图片或它的任一容器加上 <code>data-closer-ignore</code>，Closer 就永远不会碰它。</span></p>
-        <p><span lang="en">Lightbox conventions are already respected: <code>data-lightbox</code>, <code>data-fancybox</code>, <code>data-fslightbox</code>, <code>data-featherlight</code>, <code>data-zoom</code>, <code>rel="lightbox"</code>.</span><span lang="zh-CN">常见灯箱库的约定已自动让路：<code>data-lightbox</code>、<code>data-fancybox</code>、<code>data-fslightbox</code>、<code>data-featherlight</code>、<code>data-zoom</code>、<code>rel="lightbox"</code>。</span></p>
-      </div>
-    </div>
+    <p class="aside"><span lang="en">Requires Chrome 110 or later.</span><span lang="zh-CN">需要 Chrome 110 或更高版本。</span></p>
+    <p class="aside">
+      <span lang="en">Run a website? Add <code>data-closer-ignore</code> to an image or its container and Closer won't open it.</span>
+      <span lang="zh-CN">做网站的话：给图片或它的外层元素加上 <code>data-closer-ignore</code>，Closer 就不会打开它。</span>
+    </p>
   </div>
 </section>
 
@@ -533,10 +502,10 @@
 
 <footer>
   <div class="wrap">
-    <span><span lang="en">Closer · MIT licensed · made without a build step</span><span lang="zh-CN">Closer · MIT 许可 · 没有构建步骤</span></span>
+    <span><span lang="en">Closer · MIT License</span><span lang="zh-CN">Closer · MIT 许可</span></span>
     <nav>
       <a href="privacy.html"><span lang="en">Privacy</span><span lang="zh-CN">隐私政策</span></a>
-      <a href="https://github.com/shiroixw/Closer/issues"><span lang="en">Report a misjudgment</span><span lang="zh-CN">报告误判</span></a>
+      <a href="https://github.com/shiroixw/Closer/issues"><span lang="en">Report a problem</span><span lang="zh-CN">反馈问题</span></a>
       <a href="https://github.com/shiroixw/Closer">GitHub</a>
     </nav>
   </div>
@@ -577,26 +546,22 @@
         title: 'Closer — Click any image to view it full size',
         hero: 'A mountain road under low clouds',
         info: 'Image info',
-        keys: 'Keyboard shortcuts',
         lang: 'Switch to Chinese',
       },
       'zh-CN': {
         title: 'Closer — 点任意图片，按原尺寸查看',
         hero: '低云下的一条山路',
-        info: '图片详情',
-        keys: '快捷键',
+        info: '图片信息',
         lang: '切换到英文',
       },
     };
     const sw = document.getElementById('lang');
-    const keys = document.querySelector('.keys');
     const apply = (lang) => {
       const t = ATTRS[lang];
       document.documentElement.lang = lang;
       document.title = t.title;
       img.alt = t.hero;
       btn.title = t.info;
-      keys.setAttribute('aria-label', t.keys);
       sw.setAttribute('aria-label', t.lang);
     };
     apply(window.CLOSER_LANG);

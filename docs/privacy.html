@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Closer — Privacy Policy</title>
+<meta name="description" content="Closer collects no data. This page lists what it stores on your device, the one kind of network request it makes, and why it needs each permission.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect x='4' y='4' width='120' height='120' rx='30' fill='%23121214'/%3E%3Cg fill='%23f2f2f5'%3E%3Cpath fill-rule='evenodd' d='M38 24h52a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H38a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14zm7 14a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V45a7 7 0 0 0-7-7z'/%3E%3Ccircle cx='52' cy='54' r='7'/%3E%3Cpath d='M36 92 64 56 92 92z'/%3E%3C/g%3E%3C/svg%3E">
+
+<!--
+  隐私政策（D38：放仓库、中英同一个文件、GitHub Pages 托管；D40：与官网同一套页头和语言切换）。
+  每一条说法都要能在源码里找到对应：无遥测、只有一种取图请求（src/background.js）、
+  两项本地设置（chrome.storage.local：背景、暂停列表）、manifest 里的三项权限 + 可选站点访问。
+  改代码时如果动到这些，这一页跟着改，顶部日期也改。
+
+  语言：有 JS 时只显示一种（与官网共用 localStorage 的 closer-site-lang 与 ?lang=）；
+  没有 JS 时中英都显示，与 D38 的「中英同页」原样一致。
+-->
+
+<script>
+  (() => {
+    const norm = (v) => (/^zh/i.test(v || '') ? 'zh-CN' : /^en/i.test(v || '') ? 'en' : '');
+    let saved = '';
+    try { saved = localStorage.getItem('closer-site-lang') || ''; } catch {}
+    const lang =
+      norm(new URLSearchParams(location.search).get('lang')) ||
+      norm(saved) ||
+      (/^zh(-(cn|sg|hans)\b|$)/i.test(navigator.language || '') ? 'zh-CN' : 'en');
+    // data-one 只在有 JS 时出现：CSS 靠它决定「只显示一种」还是「两种都显示」
+    document.documentElement.lang = lang;
+    document.documentElement.dataset.one = '';
+    if (lang === 'zh-CN') document.title = 'Closer — 隐私政策';
+  })();
+</script>
+
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --line: #26262a;
+    --text: #f4f4f5;
+    --body: #c9c9c6;
+    --dim: #a1a1aa;
+    --faint: #71717a;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  html[data-one][lang="zh-CN"] [lang="en"],
+  html[data-one][lang="en"] [lang="zh-CN"],
+  html[data-one] .both-only { display: none !important; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.7 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  code { font-family: var(--mono); font-size: .86em; color: #d4d4d8; background: #1c1c20; padding: 1px 6px; border-radius: 5px; }
+
+  /* 页头：与 index.html 同一套数值 */
+  .top { position: sticky; top: 0; z-index: 10; background: rgba(11, 11, 12, .78); backdrop-filter: saturate(140%) blur(12px); -webkit-backdrop-filter: saturate(140%) blur(12px); border-bottom: 1px solid var(--line); }
+  .top .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; text-decoration: none; letter-spacing: -.01em; }
+  .brand svg { width: 28px; height: 28px; display: block; }
+  .nav { display: flex; align-items: center; gap: 22px; font-size: 14px; }
+  .nav a { color: var(--dim); text-decoration: none; transition: color .15s ease; }
+  .nav a:hover { color: var(--text); }
+  .lang {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    border: 1px solid var(--line); font-size: 13px; line-height: 1; color: var(--faint);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .lang:hover { border-color: #3f3f46; background: #141417; }
+  .lang:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .lang i { font-style: normal; color: #3f3f46; }
+  html[lang="en"] .lang [data-l="en"],
+  html[lang="zh-CN"] .lang [data-l="zh-CN"] { color: var(--text); font-weight: 600; }
+
+  main { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+  h1 { font-size: 34px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.02em; font-weight: 650; }
+  .meta { color: var(--faint); font-size: 14px; margin: 0 0 28px; }
+  .lead { font-size: 17px; color: var(--body); }
+  h2 { font-size: 19px; margin: 44px 0 12px; font-weight: 600; }
+  p, li { color: var(--body); }
+  p { margin: 0 0 12px; }
+  ul { margin: 0 0 12px; padding-left: 20px; }
+  li { margin: 0 0 8px; }
+  li::marker { color: var(--faint); }
+  .both-only { border: 0; border-top: 1px solid var(--line); margin: 64px 0; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 24px 44px; color: var(--faint); font-size: 13.5px; text-align: center; }
+  footer a { color: var(--dim); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  @media (max-width: 640px) {
+    .nav { gap: 16px; }
+    main { padding-top: 44px; }
+    h1 { font-size: 28px; }
+  }
+</style>
+
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 128 128" aria-hidden="true"><rect x="4" y="4" width="120" height="120" rx="30" fill="#121214" stroke="#2a2a30" stroke-width="2"/><g fill="#f2f2f5"><path fill-rule="evenodd" d="M38 24h52a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H38a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14zm7 14a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V45a7 7 0 0 0-7-7z"/><circle cx="52" cy="54" r="7"/><path d="M36 92 64 56 92 92z"/></g></svg>
+      Closer
+    </a>
+    <nav class="nav">
+      <a href="./"><span lang="en">Home</span><span lang="zh-CN">首页</span></a>
+      <a href="https://github.com/shiroixw/Closer">GitHub</a>
+      <button class="lang" id="lang" type="button" hidden><span data-l="en">EN</span><i>/</i><span data-l="zh-CN">中</span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<article lang="en">
+  <h1>Privacy Policy</h1>
+  <p class="meta">Last updated: 2026-10-26 · Version 0.1.0</p>
+
+  <p class="lead">Closer is a Chrome extension that opens the image you click at full size. It has no account, no server and no analytics, so this policy is short.</p>
+
+  <h2>What Closer doesn't do</h2>
+  <ul>
+    <li>It doesn't collect, send, sell or share any personal data. There is no server.</li>
+    <li>It doesn't use analytics, telemetry, crash reporting or remote configuration.</li>
+    <li>It doesn't load code from the internet. Everything that runs is inside the extension, and the source is public.</li>
+    <li>It doesn't read page text, form fields, the clipboard, your browsing history or cookies.</li>
+    <li>It doesn't track you across websites.</li>
+  </ul>
+
+  <h2>What's stored on your device</h2>
+  <p>Two settings, saved in the browser's extension storage (<code>chrome.storage.local</code>). They never leave your computer:</p>
+  <ul>
+    <li>the backdrop you picked (dark, light or checkerboard);</li>
+    <li>the sites where you paused Closer.</li>
+  </ul>
+  <p>Uninstalling Closer deletes both. Nothing is synced.</p>
+
+  <h2>Network requests</h2>
+  <p>When you open an image, Closer requests that image's own address to find out its file size and format. If you click save, the same data is used to save the original file.</p>
+  <p>The request goes to the website that hosts the image, the same way the page loaded it. Closer doesn't route it through any server and doesn't add anything that identifies you. The data is kept in memory and then thrown away; nothing is uploaded. If the browser already has the image cached, no request is made.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><code>storage</code>: saves the two settings above on your device.</li>
+    <li><code>scripting</code>: adds the image viewer to the page you're on.</li>
+    <li><code>activeTab</code>: lets the toolbar popup show which site you're on.</li>
+    <li>Optional access to all sites: Closer only starts working after you allow this on its welcome page. You can turn it off any time from the welcome page, the toolbar popup or <code>chrome://extensions</code>, and it stops right away.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p>Questions or problems: <a href="https://github.com/shiroixw/Closer/issues">github.com/shiroixw/Closer/issues</a>.</p>
+  <p>If this policy changes, the date at the top will change too.</p>
+</article>
+
+<hr class="both-only">
+
+<article lang="zh-CN">
+  <h1>隐私政策</h1>
+  <p class="meta">最后更新：2026-10-26 · 版本 0.1.0</p>
+
+  <p class="lead">Closer 是一个 Chrome 扩展，点一下网页上的图片，就能按原尺寸查看。它没有账号、没有服务器，也不做数据统计，所以这份说明很短。</p>
+
+  <h2>Closer 不会做的事</h2>
+  <ul>
+    <li>不收集、不上传、不出售、不分享任何个人数据。它没有服务器。</li>
+    <li>没有数据统计、遥测、崩溃上报，也不从网上拉取配置。</li>
+    <li>不从网上加载代码。运行的代码都在扩展包里，源码公开。</li>
+    <li>不读取网页正文、表单内容、剪贴板、浏览记录和 Cookie。</li>
+    <li>不跨网站追踪你。</li>
+  </ul>
+
+  <h2>保存在你电脑上的东西</h2>
+  <p>两项设置，存在浏览器的扩展存储（<code>chrome.storage.local</code>）里，不会离开你的电脑：</p>
+  <ul>
+    <li>你选的背景（深色、浅色或棋盘格）；</li>
+    <li>你暂停了 Closer 的网站列表。</li>
+  </ul>
+  <p>卸载 Closer 后，这两项会一起删除。不会同步到任何地方。</p>
+
+  <h2>网络请求</h2>
+  <p>打开一张图时，Closer 会请求这张图本身的地址，用来读出文件大小和格式。如果你点了保存，保存的就是这份原文件。</p>
+  <p>请求发往存放这张图的网站，和网页加载这张图的方式一样。Closer 不经过任何服务器，也不附加能识别你的信息。数据只在内存里用一下就丢掉，不会上传。如果浏览器已经缓存了这张图，就不会发请求。</p>
+
+  <h2>权限说明</h2>
+  <ul>
+    <li><code>storage</code>：在你电脑上保存上面那两项设置。</li>
+    <li><code>scripting</code>：把查看器加到你正在看的网页里。</li>
+    <li><code>activeTab</code>：让工具栏弹窗显示你当前所在的网站。</li>
+    <li>可选的「访问所有网站」：只有你在欢迎页里点了允许，Closer 才开始工作。之后可以随时在欢迎页、工具栏弹窗或 <code>chrome://extensions</code> 里关掉，关掉立即生效。</li>
+  </ul>
+
+  <h2>联系</h2>
+  <p>有问题或发现 bug：<a href="https://github.com/shiroixw/Closer/issues">github.com/shiroixw/Closer/issues</a>。</p>
+  <p>这份政策如果有改动，顶部的日期会一起更新。</p>
+</article>
+
+</main>
+
+<footer>
+  <a href="./">Closer</a> · <span lang="en">MIT License</span><span lang="zh-CN">MIT 许可</span>
+</footer>
+
+<script>
+  (() => {
+    const sw = document.getElementById('lang');
+    const TITLE = { en: 'Closer — Privacy Policy', 'zh-CN': 'Closer — 隐私政策' };
+    const LABEL = { en: 'Switch to Chinese', 'zh-CN': '切换到英文' };
+    const apply = (lang) => {
+      document.documentElement.lang = lang;
+      document.title = TITLE[lang];
+      sw.setAttribute('aria-label', LABEL[lang]);
+    };
+    apply(document.documentElement.lang);
+    sw.hidden = false;
+    sw.addEventListener('click', () => {
+      const next = document.documentElement.lang === 'zh-CN' ? 'en' : 'zh-CN';
+      apply(next);
+      try { localStorage.setItem('closer-site-lang', next); } catch {}
+      const url = new URL(location.href);
+      if (url.searchParams.has('lang')) {
+        url.searchParams.set('lang', next === 'zh-CN' ? 'zh' : 'en');
+        history.replaceState(null, '', url);
+      }
+    });
+  })();
+</script>
+</body>
+</html>
