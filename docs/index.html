@@ -162,19 +162,47 @@
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 80%; height: auto; display: block; max-width: none;
     box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+    transition: width .32s cubic-bezier(.2, .8, .2, 1), box-shadow .32s ease;
   }
-  .viewer .bar { position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; pointer-events: none; }
+  .viewer .bar {
+    position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; pointer-events: none;
+    transition: opacity .18s ease, visibility 0s;
+  }
+  /* 四颗按钮都是真的：i 开关面板，复制 / 保存 / 关闭与扩展里做同样的事（D40） */
   .viewer .chip {
     all: unset; box-sizing: border-box; display: grid; place-items: center;
     width: 32px; height: 32px; border-radius: 9px;
     background: rgba(24, 24, 27, .62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    color: inherit;
+    color: inherit; cursor: pointer; pointer-events: auto;
+    font: 600 15px/1 ui-sans-serif, system-ui, sans-serif;
+    transition: background .14s ease, color .14s ease;
   }
-  .viewer button.chip { cursor: pointer; pointer-events: auto; font: 600 15px/1 ui-sans-serif, system-ui, sans-serif; transition: background .14s ease; }
-  .viewer button.chip:hover { background: rgba(63, 63, 70, .9); }
-  .viewer button.chip:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .viewer .chip:hover { background: rgba(63, 63, 70, .9); }
+  .viewer .chip:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .viewer .chip.done { color: #4ade80; }
   .viewer .actions { display: flex; gap: 4px; }
   .viewer .chip svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .viewer .toast {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); padding: 7px 13px;
+    border-radius: 9px; background: rgba(24, 24, 27, .9); font-size: 12px; white-space: nowrap;
+    opacity: 0; transition: opacity .14s ease; pointer-events: none;
+  }
+  .viewer .toast.on { opacity: 1; }
+
+  /* 关闭后：图缩回「页面里的一张图」，工具条与面板退场；点图再打开。
+     visibility 只在「关」的方向延迟（等淡出播完）；「开」的方向必须立刻可见，
+     否则过渡第 0 帧仍是 hidden，重开时把焦点还给关闭按钮会落空（实测落到 body）。 */
+  .viewer .panel { transition: opacity .18s ease, visibility 0s; }
+  .demo.closed .bar,
+  .demo.closed .panel { opacity: 0; visibility: hidden; transition: opacity .18s ease, visibility 0s .18s; }
+  .demo.closed .photo { width: 44%; cursor: zoom-in; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
+  .demo.closed .photo:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 4px; }
+  .demo .when-closed,
+  .demo.closed .when-open { display: none; }
+  .demo.closed .when-closed { display: inline; }
+  @media (prefers-reduced-motion: reduce) {
+    .viewer .photo, .viewer .bar, .viewer .panel { transition: none; }
+  }
   .viewer .panel {
     position: absolute; top: 56px; left: 14px; width: 232px; padding: 12px 14px; border-radius: 12px;
     background: rgba(24, 24, 27, .86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -255,6 +283,7 @@
     .verdict, .grid, .privacy, .steps { grid-template-columns: 1fr; }
     .viewer { aspect-ratio: 4 / 3; }
     .viewer .photo { width: 92%; }
+    .demo.closed .photo { width: 60%; }
     .viewer .panel { width: 196px; padding: 10px 12px; }
   }
 </style>
@@ -306,15 +335,15 @@
     <li><span lang="en">Open source, MIT</span><span lang="zh-CN">开源，MIT 许可</span></li>
   </ul>
 
-  <figure class="demo">
+  <figure class="demo" id="demo">
     <div class="viewer">
       <img class="photo" id="hero" src="assets/hero.jpg" width="1600" height="1000" alt="A mountain road under low clouds" fetchpriority="high" decoding="async">
       <div class="bar">
         <button class="chip" id="info" type="button" aria-expanded="true" aria-controls="panel" title="Image info">i</button>
-        <div class="actions" aria-hidden="true">
-          <span class="chip"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></span>
-          <span class="chip"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg></span>
-          <span class="chip"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+        <div class="actions">
+          <button class="chip" id="copy" type="button" title="Copy image (⇧ click: copy address)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></button>
+          <a class="chip" id="save" href="assets/hero.jpg" download="hero.jpg" title="Save image"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg></a>
+          <button class="chip" id="close" type="button" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
       </div>
       <div class="panel" id="panel">
@@ -325,10 +354,11 @@
         <hr>
         <div class="pause"><span lang="en">Pause on</span><span lang="zh-CN">在</span> <span class="site">shiroixw.github.io</span><span lang="zh-CN"> 上暂停</span></div>
       </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
     <figcaption class="caption">
-      <span lang="en">Already have Closer? Click the photo and compare.</span>
-      <span lang="zh-CN">已经装了 Closer？点这张照片对比一下。</span>
+      <span class="when-open"><span lang="en">Already have Closer? Click the photo and compare.</span><span lang="zh-CN">已经装了 Closer？点这张照片对比一下。</span></span>
+      <span class="when-closed"><span lang="en">Click the photo to open it again.</span><span lang="zh-CN">点照片重新打开。</span></span>
     </figcaption>
   </figure>
 </div>
@@ -534,34 +564,139 @@
       btn.setAttribute('aria-expanded', String(!panel.hidden));
     });
 
+    // ── 右边三颗：和扩展做同样的事，反馈也一样（对勾 1.2 s + 底部提示 1.4 s，见 overlay.js 的 flash / say）──
+    let L = ATTRS_OF(window.CLOSER_LANG);
+    const demo = document.getElementById('demo');
+    const copyBtn = document.getElementById('copy');
+    const saveBtn = document.getElementById('save');
+    const closeBtn = document.getElementById('close');
+    const toast = document.getElementById('toast');
+    const CHECK = '<svg viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></svg>';
+
+    const flash = (el) => {
+      if (el.classList.contains('done')) return;
+      const html = el.innerHTML;
+      el.classList.add('done');
+      el.innerHTML = CHECK;
+      setTimeout(() => { el.classList.remove('done'); el.innerHTML = html; }, 1200);
+    };
+    let toastTimer = 0;
+    const say = (text) => {
+      toast.textContent = text;
+      toast.classList.add('on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('on'), 1400);
+    };
+
+    // 复制：与扩展同一条路——画进 canvas 转 PNG（剪贴板只认 PNG），⇧ 点击复制地址。
+    // 把 Promise 直接交给 ClipboardItem，而不是 await 完再写：Safari 要求写入发生在点击的那一拍里。
+    copyBtn.addEventListener('click', async (e) => {
+      try {
+        if (e.shiftKey) {
+          await navigator.clipboard.writeText(img.src);
+          say(L.addrCopied);
+        } else {
+          const png = new Promise((resolve, reject) => {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/png');
+          });
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+          say(L.copied);
+        }
+        flash(copyBtn);
+      } catch {
+        say(L.copyFailed);
+      }
+    });
+
+    // 保存：就是一个 <a download>（扩展也是这么存的，D12），这里只补反馈。
+    saveBtn.addEventListener('click', () => {
+      flash(saveBtn);
+      say(L.saved);
+    });
+
+    // 关闭：图缩回页面里的大小，工具条退场；点图重新打开。
+    // 打开状态下点图不做任何事——留给装了 Closer 的人对比。关闭状态下点图会改 #demo 的 class，
+    // 扩展的让位检测（D30）看到页面接住了这次点击，会自己退场，不会叠两层。
+    const setClosed = (closed) => {
+      demo.classList.toggle('closed', closed);
+      if (closed) {
+        img.tabIndex = 0;
+        img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', L.reopen);
+        img.focus({ preventScroll: true });
+      } else {
+        img.removeAttribute('tabindex');
+        img.removeAttribute('role');
+        img.removeAttribute('aria-label');
+        closeBtn.focus({ preventScroll: true });
+      }
+    };
+    closeBtn.addEventListener('click', () => setClosed(true));
+    img.addEventListener('click', () => {
+      if (demo.classList.contains('closed')) setClosed(false);
+    });
+    img.addEventListener('keydown', (e) => {
+      if (demo.classList.contains('closed') && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        setClosed(false);
+      }
+    });
+
     const top = document.getElementById('top');
     const edge = () => top.classList.toggle('scrolled', scrollY > 8);
     addEventListener('scroll', edge, { passive: true });
     edge();
 
     // ── 语言切换 ──
-    // 正文靠 CSS 显隐，这里只补 CSS 管不到的：<title> 与几处属性文案。
-    const ATTRS = {
-      en: {
-        title: 'Closer — Click any image to view it full size',
-        hero: 'A mountain road under low clouds',
-        info: 'Image info',
-        lang: 'Switch to Chinese',
-      },
-      'zh-CN': {
-        title: 'Closer — 点任意图片，按原尺寸查看',
-        hero: '低云下的一条山路',
-        info: '图片信息',
-        lang: '切换到英文',
-      },
-    };
+    // 正文靠 CSS 显隐，这里只补 CSS 管不到的：<title>、属性文案与提示语。
+    // 演示按钮的文案与扩展的 _locales 用词一致（copyImage / saveImage / close / copied …）。
+    function ATTRS_OF(lang) {
+      return {
+        en: {
+          title: 'Closer — Click any image to view it full size',
+          hero: 'A mountain road under low clouds',
+          info: 'Image info',
+          copy: 'Copy image (⇧ click: copy address)',
+          save: 'Save image',
+          close: 'Close',
+          reopen: 'Open the photo again',
+          copied: 'Copied',
+          addrCopied: 'Address copied',
+          copyFailed: 'Copy failed',
+          saved: 'Download started',
+          lang: 'Switch to Chinese',
+        },
+        'zh-CN': {
+          title: 'Closer — 点任意图片，按原尺寸查看',
+          hero: '低云下的一条山路',
+          info: '图片信息',
+          copy: '复制图片（⇧ 点击：复制地址）',
+          save: '保存图片',
+          close: '关闭',
+          reopen: '重新打开这张照片',
+          copied: '已复制',
+          addrCopied: '已复制地址',
+          copyFailed: '复制失败',
+          saved: '已开始下载',
+          lang: '切换到英文',
+        },
+      }[lang];
+    }
     const sw = document.getElementById('lang');
     const apply = (lang) => {
-      const t = ATTRS[lang];
+      const t = (L = ATTRS_OF(lang));
       document.documentElement.lang = lang;
       document.title = t.title;
       img.alt = t.hero;
       btn.title = t.info;
+      copyBtn.title = t.copy;
+      saveBtn.title = t.save;
+      closeBtn.title = t.close;
+      if (img.hasAttribute('role')) img.setAttribute('aria-label', t.reopen);
       sw.setAttribute('aria-label', t.lang);
     };
     apply(window.CLOSER_LANG);
