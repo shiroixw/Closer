@@ -14,17 +14,34 @@
   Closer 的官网。和扩展守同一套规矩：
   · 手写、单文件、无构建、无框架（宪法第五条）——View source 看到的就是写出来的版本；
   · 不引任何第三方资源：无字体 CDN、无统计、无外链脚本（第四条）——这一页自己就不该成为隐私政策的反例；
-  · 中英两种，按浏览器语言自动选，不给开关（D29 同一口径）。没有 JS 时显示英文。
+  · 中英两种写在同一份 DOM 里，按 <html lang> 只显示一种。默认按浏览器语言选，页头有切换（D40）。
+    没有 JS 时显示英文，切换按钮也不出现。
   页面上的读数（1600 × 1000、JPEG · 203 KB）就是 assets/hero.jpg 的真实值，
   「显示 W × H」与「在 … 上暂停」由下面的脚本按 Closer 的同一算法现场算出。
 -->
 
+<link rel="alternate" hreflang="en" href="https://shiroixw.github.io/Closer/?lang=en">
+<link rel="alternate" hreflang="zh-CN" href="https://shiroixw.github.io/Closer/?lang=zh">
+<link rel="alternate" hreflang="x-default" href="https://shiroixw.github.io/Closer/">
+
 <script>
-  // 与扩展的 _locales 回退口径一致：只有简体中文落到 zh-CN，其余（含 zh-TW）回到英文。
-  if (/^zh(-(cn|sg|hans)\b|$)/i.test(navigator.language || '')) {
-    document.documentElement.lang = 'zh-CN';
-    document.title = 'Closer — 点任意图片，按原尺寸查看';
-  }
+  // 语言的来源，先到先得：
+  //   1. 链接里的 ?lang=zh / ?lang=en —— 分享出去的链接要让对方看到同一种语言；
+  //   2. 访客上次在这里按过的切换（只存在这台机器的 localStorage，不离开浏览器）；
+  //   3. 浏览器语言，口径与扩展的 _locales 一致：只有简体中文落到 zh-CN，其余（含 zh-TW）回英文。
+  // 写在 <head> 里同步执行：等到 DOMContentLoaded 再切，首屏会先闪一下另一种语言。
+  window.CLOSER_LANG = (() => {
+    const norm = (v) => (/^zh/i.test(v || '') ? 'zh-CN' : /^en/i.test(v || '') ? 'en' : '');
+    let saved = '';
+    try { saved = localStorage.getItem('closer-site-lang') || ''; } catch {} // 隐私模式下可能直接抛
+    return (
+      norm(new URLSearchParams(location.search).get('lang')) ||
+      norm(saved) ||
+      (/^zh(-(cn|sg|hans)\b|$)/i.test(navigator.language || '') ? 'zh-CN' : 'en')
+    );
+  })();
+  document.documentElement.lang = window.CLOSER_LANG;
+  if (window.CLOSER_LANG === 'zh-CN') document.title = 'Closer — 点任意图片，按原尺寸查看';
 </script>
 
 <style>
@@ -82,6 +99,22 @@
   .nav { display: flex; gap: 22px; font-size: 14px; }
   .nav a { color: var(--dim); text-decoration: none; transition: color .15s ease; }
   .nav a:hover { color: var(--text); }
+  .nav { align-items: center; }
+
+  /* 语言切换：两档并排，当前那档亮，整颗按钮点一下就换到另一档 */
+  .lang {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    border: 1px solid var(--line); font-size: 13px; line-height: 1; color: var(--faint);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .lang:hover { border-color: #3f3f46; background: #141417; }
+  .lang:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .lang i { font-style: normal; color: #3f3f46; }
+  .lang span { transition: color .15s ease; }
+  html[lang="en"] .lang [data-l="en"],
+  html[lang="zh-CN"] .lang [data-l="zh-CN"] { color: var(--text); font-weight: 600; }
 
   /* ── 首屏 ─────────────────────────────── */
   .hero { padding-top: 88px; padding-bottom: 40px; text-align: center; }
@@ -247,6 +280,8 @@
       <a class="opt" href="#install"><span lang="en">Install</span><span lang="zh-CN">安装</span></a>
       <a href="privacy.html"><span lang="en">Privacy</span><span lang="zh-CN">隐私</span></a>
       <a href="https://github.com/shiroixw/Closer">GitHub</a>
+      <!-- 两个标签都不带 lang 属性：带了就会被上面「只留一种语言」的规则藏掉一半 -->
+      <button class="lang" id="lang" type="button" hidden><span data-l="en">EN</span><i>/</i><span data-l="zh-CN">中</span></button>
     </nav>
   </div>
 </header>
@@ -534,6 +569,49 @@
     const edge = () => top.classList.toggle('scrolled', scrollY > 8);
     addEventListener('scroll', edge, { passive: true });
     edge();
+
+    // ── 语言切换 ──
+    // 正文靠 CSS 显隐，这里只补 CSS 管不到的：<title> 与几处属性文案。
+    const ATTRS = {
+      en: {
+        title: 'Closer — Click any image to view it full size',
+        hero: 'A mountain road under low clouds',
+        info: 'Image info',
+        keys: 'Keyboard shortcuts',
+        lang: 'Switch to Chinese',
+      },
+      'zh-CN': {
+        title: 'Closer — 点任意图片，按原尺寸查看',
+        hero: '低云下的一条山路',
+        info: '图片详情',
+        keys: '快捷键',
+        lang: '切换到英文',
+      },
+    };
+    const sw = document.getElementById('lang');
+    const keys = document.querySelector('.keys');
+    const apply = (lang) => {
+      const t = ATTRS[lang];
+      document.documentElement.lang = lang;
+      document.title = t.title;
+      img.alt = t.hero;
+      btn.title = t.info;
+      keys.setAttribute('aria-label', t.keys);
+      sw.setAttribute('aria-label', t.lang);
+    };
+    apply(window.CLOSER_LANG);
+    sw.hidden = false;
+    sw.addEventListener('click', () => {
+      const next = document.documentElement.lang === 'zh-CN' ? 'en' : 'zh-CN';
+      apply(next);
+      try { localStorage.setItem('closer-site-lang', next); } catch {}
+      // 链接里带着 ?lang= 时跟着改，否则刷新会被它改回去；没带就不往地址栏里加东西
+      const url = new URL(location.href);
+      if (url.searchParams.has('lang')) {
+        url.searchParams.set('lang', next === 'zh-CN' ? 'zh' : 'en');
+        history.replaceState(null, '', url);
+      }
+    });
   })();
 </script>
 </body>
