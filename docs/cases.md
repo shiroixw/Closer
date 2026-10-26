@@ -25,6 +25,8 @@
 
 | 011 | 2026-10-26 | km 调查页（`/group/37039/surveys/show/128175`）的正文长图：作者给 `<img class="amplify">` 挂 `cursor: url(cursor_zoom.cur), pointer`，点击由 JS 处理、`window.open` 把原图开在新标签页（不是 `<a>`） | 判断器第 12 条只认字面量 `cursor: pointer`，计算值是 `url("…cursor_zoom-….cur"), pointer` → 判据沉默；页面无 `<a>`、无 `role`、无 `onclick`，前 11 条也全过。让位：页面的动作是开新窗口，`window.open` 不在 DOM 上留任何痕迹，`href` / 全屏 / 命中点 / 滚动锁 / `skin` 五判据全哑 → 我们接管**的同时**页面也开了新标签，一次点击做了两件事（真机实测：`#closer` 出现 + 新标签页出现） | 判断器第 12 条改认「pointer 语义」：计算值以 `pointer` 结尾即跳过，`pointer` 与 `url(…), pointer` 是同一句话（D34）。兜底写 `auto` / 没有兜底的 `url(…)` 都不认——那可能只是皮肤 | `test-judge` 七条（km 形态 / 带热点坐标 / 容器上继承 / 多段兜底 / 单值 url 不算 / 兜底 auto 不算 / URL 里带 `pointer` 但兜底 auto 也不算）；`e6` K1–K3（真扩展 + headless：不接管 / 页面自己的处理器照常跑 / 兜底 auto 的皮肤照常打开）；真机 KM 页注入两份 `detect.js` 对照：那张 1080×1785 的正文图 `judge()` 由 **true → false**，同页其余 12 张图结论完全不变；阮一峰周刊 416 复验 30 张正文图仍全部 true |
 
+| 012 | 2026-10-26 | bilibili 首页（`www.bilibili.com`）的页头横幅：`<picture>`（属性图 2560×240）+ `div.animated-banner` 里 29 层视差 `<img>`（3840×360 的透明切片），上面压着 `div.header-banner__inner`（装着 `a.inner-logo`）和 `div.taper-line`（`pointer-events:none`），右侧还有登录浮层。点页头任意空白处、以及登录浮层的空白处，都会打开一张透明切片 | **判断器 13 条全过**：图不在 `<header>`/`<nav>` 里（这站用的是 `div.bili-header`）、不在链接里、无控件、无 `cursor:pointer`、`z-index` 全是 `auto`/`0`（负 z-index 那条判据沉默）、2560×240 面积与短边都过。**结构性沉默的是 `pick()`**：target 是 `div.header-banner__inner`（或登录浮层），`fromPoint` 按命中栈把最上面那层视差切片找回来，`sameFrame()` 认的共同祖先正是整条横幅——它和 004「图被装饰盖住」DOM 同构，与 010 同一族缺口（`z-index:auto` 的底图） | `pick()` 找回路径加边界：找回来的图若铺满视口宽度（≥98%）判为版面的底，不接管（D35）。**不改成「命中层里有链接就放行」**：实测 004 的致谢遮罩里就有 `<a>` 和按钮，那样会把 004 打回「点了没反应」 | `e4`「版面的底（全宽横幅上压着内容层）：点内容层不接管」（修前红、修后绿）；真机 bilibili 三处点击修后全拒（页头空白 / 右侧浮层空白 / 去掉视差层只剩静态 picture），同页「500 px 宽、被透明装饰盖住」的对照图仍能打开 |
+
 ## 写新条目时
 
 1. **先复现**：在真实页面上点一次，确认是误判还是漏判，别凭截图猜。
