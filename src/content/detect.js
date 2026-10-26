@@ -66,7 +66,7 @@ Closer.judge = function (img) {
   //    代价写在 D25：500 × 500 的正方形插画会被一起跳过。
   if (nw === nh && nw < SQUARE_MAX) return false;
 
-  // 12 祖先链上有一块自己声明了 cursor:pointer 的区域：设计者把它做成了可点区域。
+  // 12 祖先链上有一块声明了 pointer 语义光标的区域：设计者把它做成了可点区域。
   if (clickBox(img)) return false;
 
   // 13 页面把它放进了背景层：图自己或某层祖先声明了负 z-index。
@@ -173,7 +173,7 @@ function fullBleed(img) {
 }
 
 /**
- * 找「声明了 cursor:pointer 的那层容器」，找不到返回 null。
+ * 找「声明了 pointer 语义光标的那层容器」，找不到返回 null。
  *
  * 为什么要它：H5 活动页把整张卡片做成 <section> + JS 事件委托，既不是 <a>
  * 也不是 <button>，没有 role、没有 onclick 属性——上面十条一条都拦不住；而它点击后
@@ -182,6 +182,10 @@ function fullBleed(img) {
  *
  * 为什么不是 D10 删掉的 zoom-in：pointer 没有方向歧义，只表示「点我」，
  * 不像 zoom-in 还暗示「能放大」。所以这不是把那条规则加回来。
+ *
+ * 为什么认「pointer 语义」而不是字面量：装了自定义光标的站点写的是
+ * `url(zoom.cur), pointer`——兜底仍是 pointer，说的是同一句话（km 的调查页，
+ * cases 011 / D34）。
  *
  * cursor 是继承属性，必须只认「声明的边界」：父元素也是 pointer 就说明它从更上层
  * 继承来的，继续往上找；到 body 都没有边界就当没有，否则 body{cursor:pointer}
@@ -193,13 +197,20 @@ function clickBox(img) {
 
   for (let i = 0; i < MAX && n; i++, n = n.parentElement) {
     if (n === document.body || n === document.documentElement) return null;
-    if (getComputedStyle(n).cursor !== 'pointer') continue;
+    if (!pointsAt(n)) continue;
 
     const up = n.parentElement;
-    if (up && up !== document.body && getComputedStyle(up).cursor === 'pointer') continue;
+    if (up && up !== document.body && pointsAt(up)) continue;
     return n;
   }
   return null;
+}
+
+// 这个元素的光标是否在说「点我」：只看结尾。`cursor` 的计算值是规范化的，
+// 所以「结尾是 pointer」= 「作者给的兜底语义是 pointer」——`url(…), auto` 与
+// 单值 `url(…)` 都不算；不用 includes：URL 里出现 pointer 是巧合（D34）。
+function pointsAt(el) {
+  return (getComputedStyle(el).cursor || '').endsWith('pointer');
 }
 
 /**

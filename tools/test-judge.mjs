@@ -71,6 +71,15 @@ const cases = [
   ['配置卡片的横幅图（cursor 继承自容器）', img({ cursor: 'pointer', parents: [{ cursor: 'pointer' }] }), false],
   ['图片自己声明 cursor:pointer', img({ cursor: 'pointer' }), false],
   ['普通正文图', img({ cursor: 'auto' }), true],
+  // km 调查页：正文图挂 `cursor: url(cursor_zoom.cur), pointer`，点击是 window.open 开新标签页，
+  // 页面上再没有别的痕迹（无 <a>、无 role、无 onclick）。兜底写 pointer，语义仍是「点我」（D34）。
+  ['自定义光标 + pointer 兜底（km）', img({ cursor: 'url("https://km.woa.com/img/cursor_zoom.cur"), pointer' }), false],
+  ['自定义光标带热点坐标，兜底 pointer', img({ cursor: 'url("hand.cur") 4 4, pointer' }), false],
+  ['自定义光标在容器上，图靠继承', img({ cursor: 'url("zoom.cur"), pointer', parents: [{ cursor: 'url("zoom.cur"), pointer' }] }), false],
+  ['自定义光标多段兜底（url, url, pointer）', img({ cursor: 'url("a.cur"), url("b.cur"), pointer' }), false],
+  ['单值自定义光标（没有兜底，不算表态）', img({ cursor: 'url("only.cur")' }), true],
+  ['光标兜底 auto，URL 里带 pointer（不能按子串判）', img({ cursor: 'url("/img/pointer.cur"), auto' }), true],
+  ['自定义光标兜底 auto（可能只是皮肤，不算表态）', img({ cursor: 'url("skin.cur"), auto' }), true],
   // 正方形小图：二维码、头像。门槛 600，代价是正方形插画被一起跳过（D25）。
   ['250×250 二维码', img({ nw: 250, nh: 250, w: 250, h: 250 }), false],
   ['400×400 头像', img({ nw: 400, nh: 400, w: 300, h: 300 }), false],
