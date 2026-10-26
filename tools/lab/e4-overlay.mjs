@@ -12,8 +12,8 @@ import { deflateSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
 import { clean } from './clean-extensions.mjs';
 
-const PORT = 8824;
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
+import { CDP, freePort } from './browser.mjs'; // 车道：本进程独占的 headless + 空闲端口
+const PORT = await freePort(); // 并行跑时各用各的端口
 // 同 check-manifest：URL.pathname 在 Windows 上是 /D:/...，拼出来是 D:\D:\...
 const ROOT = resolve(import.meta.dirname, '../..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

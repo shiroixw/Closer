@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { clean } from './clean-extensions.mjs';
 
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
+import { CDP, freePort, stageDir } from './browser.mjs'; // 车道：本进程独占的 headless、空闲端口、私有暂存目录
 const TARGET = process.env.TARGET || 'https://www.ruanyifeng.com/blog/2026/10/weekly-issue-415.html';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -19,11 +19,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- 准备测试副本 ---------- */
 
-// 固定路径是刻意的：unpacked 扩展的 id 由路径决定，用 mkdtemp 每跑一次
-// 就多一个永久残留的扩展实例（曾堆到 8 个，把 e4 的桩测试搞挂了）。
-const stage = path.join(os.tmpdir(), 'closer-live');
-fs.rmSync(stage, { recursive: true, force: true });
-fs.mkdirSync(stage, { recursive: true });
+const stage = stageDir('ext-live'); // 车道私有：并行的另一份测试不会把它删掉
 const SKIP = new Set(['.git', '.workbuddy', 'tools', 'docs', 'node_modules']);
 
 fs.cpSync(ROOT, stage, {
@@ -143,11 +139,40 @@ const evaluate = async (expression, userGesture = false) => {
   return r?.result?.result?.value;
 };
 
-// 等页面基本就绪
-for (let i = 0; i < 40; i++) {
-  const ready = await evaluate("document.readyState === 'complete' && document.images.length > 5");
-  if (ready === true) break;
+// 等页面基本就绪。
+// 等的是「有几张图已经解码」而不是「DOM 里有几个 img」：车道浏览器每次都是冷 profile、
+// 没有网络缓存，首屏比复用实例慢，DOM 早就 complete 而图还没回来——原来按 img 数量判，
+// 会在这种时候放行，然后在 pickImage() 那一步说「页面上没有可用的测试图」（偶发假失败）。
+const decoded = () =>
+  evaluate(
+    "document.readyState === 'complete' && [...document.images].filter((i) => i.naturalWidth > 0).length > 3"
+  );
+
+let ready = false;
+for (let i = 0; i < 80; i++) {
+  if ((await decoded()) === true) {
+    ready = true;
+    break;
+  }
   await sleep(250);
+}
+
+// 真站点的网络不归我们管：机器忙、站点限流时首屏可能起不来。重载一次再等，仍不行就
+// 明确说「页面没打开」，别让它伪装成一条产品断言失败（那种假红会被人当成真 bug 去查）。
+if (!ready) {
+  await page.send('Page.reload', { ignoreCache: false });
+  for (let i = 0; i < 80; i++) {
+    if ((await decoded()) === true) {
+      ready = true;
+      break;
+    }
+    await sleep(250);
+  }
+}
+if (!ready) {
+  const st = await evaluate('({ href: location.href, ready: document.readyState, imgs: document.images.length })');
+  console.error(`被测页面没能打开（网络或站点限流，不是断言失败）：${TARGET} → ${JSON.stringify(st)}`);
+  process.exit(2);
 }
 await sleep(400);
 

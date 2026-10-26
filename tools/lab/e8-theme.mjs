@@ -15,8 +15,8 @@ import http from 'node:http';
 import zlib from 'node:zlib';
 import { clean } from './clean-extensions.mjs';
 
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
-const PORT = 8833;
+import { CDP, freePort, stageDir } from './browser.mjs'; // 车道：本进程独占的 headless、空闲端口、私有暂存目录
+const PORT = await freePort(); // 并行跑时各用各的端口
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -90,9 +90,7 @@ const server = http
 
 const STUB_URL = `http://127.0.0.1:${PORT}/`;
 
-const stage = path.join(os.tmpdir(), 'closer-theme');
-fs.rmSync(stage, { recursive: true, force: true });
-fs.mkdirSync(stage, { recursive: true });
+const stage = stageDir('ext-theme'); // 车道私有：并行的另一份测试不会把它删掉
 const SKIP = new Set(['.git', '.workbuddy', 'tools', 'docs', 'node_modules']);
 fs.cpSync(ROOT, stage, {
   recursive: true,

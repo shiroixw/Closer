@@ -9,8 +9,8 @@
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 
-const PORT = 8821;
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
+import { CDP, freePort } from './browser.mjs'; // 车道：本进程独占的 headless + 空闲端口
+const PORT = await freePort(); // 并行跑时各用各的端口
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
