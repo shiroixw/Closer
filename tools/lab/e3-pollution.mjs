@@ -14,9 +14,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 
-const PAGE_PORT = 8811;
-const IMG_PORT = 8812;
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
+import { CDP, freePort } from './browser.mjs'; // 车道：本进程独占的 headless + 空闲端口
+const PAGE_PORT = await freePort(); // 并行跑时各用各的端口
+const IMG_PORT = await freePort();
 
 /* ---------- 造一张 320×240 的真 PNG ---------- */
 

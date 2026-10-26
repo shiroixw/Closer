@@ -16,7 +16,9 @@
 | `node tools/lab/e2-drift.mjs` | 图片动的时候，命中点判据会不会脱靶（480 次比对，0 漂移） |
 | `node tools/lab/e3-pollution.mjs` | 跨域图经 blob 中转后 canvas 还污不污染（不污染，复制可做） |
 
-`verify` 无需浏览器。其余脚本默认自己拉起一个**专用的 headless Chrome**（端口 9444、临时 profile，见 `tools/lab/browser.mjs`），没有窗口、不抢输入焦点与桌面焦点，跑完常驻复用，`node tools/lab/browser.mjs stop` 收掉。要看着跑时显式指定有界面的实例：`CDP=http://127.0.0.1:9333 npm run smoke`。E5 走真实站点，需要网络。
+`verify` 无需浏览器。其余脚本各自拉起一个**本进程独占的 headless Chrome**（系统分配端口、临时 profile、桩服务器用空闲端口，见 `tools/lab/browser.mjs`）：没有窗口，不抢输入焦点与桌面焦点，也**允许几个测试同时跑**——几份代码在不同工作树里并行改、并行测时，各自的扩展、端口、暂存目录互不干扰。进程退出即回收；被 `kill -9` 留下的孤儿由下一次启动顺手清掉，也可手动 `node tools/lab/browser.mjs sweep`。
+
+要看着跑时显式指定有界面的实例：`CDP=http://127.0.0.1:9333 npm run smoke`（这时会退回共享浏览器，测试之间还会互相清理扩展，别并行跑）。E5 走真实站点，需要网络。
 
 ---
 

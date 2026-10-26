@@ -10,7 +10,7 @@
 //   node tools/lab/clean-extensions.mjs        # 独立跑
 //   import { clean } from './clean-extensions.mjs'   # e4/e5/e6 开头调用
 
-import { CDP } from './browser.mjs'; // 默认 headless，不抢焦点；CDP=… 可覆盖
+import { CDP, OWNED } from './browser.mjs'; // 车道浏览器：headless、本进程独占
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function json(pathname, init) {
@@ -27,6 +27,10 @@ export async function clean(cdpBase = CDP, { quiet = false } = {}) {
   const say = (s) => {
     if (!quiet) console.log(s);
   };
+
+  // 本进程独占的车道浏览器（browser.mjs）里只有我们自己装的东西，没有残留可清。
+  // 只有连共享实例（CDP=… 看着跑）时才需要扫一遍。
+  if (OWNED && cdpBase === CDP) return [];
 
   const ver = await json('/json/version');
   if (!ver.webSocketDebuggerUrl) {
