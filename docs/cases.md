@@ -23,6 +23,8 @@
 
 | 010 | 2026-10-26 | Salesforce 保险代理页（`/ap/financial-services/insurance-agency-management-software/`）把版面的底做成 `<img class="background__image">`，包在 `position:absolute;z-index:-1` 的 `div.blade__background` 里，内容（标题、卡片）压在它上面。点击落在标题或版面空白处，会被我们接管，点开一张背景图 | **判断器 13 条全过**（2560×800、渲染 2560×508，不是链接/控件/对话框、不正方形、无 `cursor:pointer`），`pick()` 也确实把图找回来了——`elementsFromPoint` 栈里那张底图排在内容之下，`sameFrame()` 认的共同祖先恰好是整块 `<section>`。**结构性沉默**：`pick()` 只能判断「图与点击是不是同一块视觉单元」，它分不出「图上盖了遮罩」（004/005）与「图是整版的底」——两种形态 DOM 完全同构。悬停提示也不撒谎也没用：`e.target.closest('img')` 永远不命中底图，所以没有 `zoom-in` 光标，用户拿不到任何前兆 | 判断器第 13 条：图自己或某层祖先声明了负 `z-index`（作者自己说的「放到内容后面」）即跳过（D33）。**不修 `pick()`**：那两种形态在结构上无法区分，要区分只能靠作者的声明 | `test-judge` 四条（自己 -1 / 父级 -1 / 祖先 -1 / `z-index:0` 不算）；真机 salesforce 复验：背景图不再接管，正文图照常 |
 
+| 011 | 2026-10-26 | km 调查页（`/group/37039/surveys/show/128175`）的正文长图：作者给 `<img class="amplify">` 挂 `cursor: url(cursor_zoom.cur), pointer`，点击由 JS 处理、`window.open` 把原图开在新标签页（不是 `<a>`） | 判断器第 12 条只认字面量 `cursor: pointer`，计算值是 `url("…cursor_zoom-….cur"), pointer` → 判据沉默；页面无 `<a>`、无 `role`、无 `onclick`，前 11 条也全过。让位：页面的动作是开新窗口，`window.open` 不在 DOM 上留任何痕迹，`href` / 全屏 / 命中点 / 滚动锁 / `skin` 五判据全哑 → 我们接管**的同时**页面也开了新标签，一次点击做了两件事（真机实测：`#closer` 出现 + 新标签页出现） | 判断器第 12 条改认「pointer 语义」：计算值以 `pointer` 结尾即跳过，`pointer` 与 `url(…), pointer` 是同一句话（D34）。兜底写 `auto` / 没有兜底的 `url(…)` 都不认——那可能只是皮肤 | `test-judge` 七条（km 形态 / 带热点坐标 / 容器上继承 / 多段兜底 / 单值 url 不算 / 兜底 auto 不算 / URL 里带 `pointer` 但兜底 auto 也不算）；`e6` K1–K3（真扩展 + headless：不接管 / 页面自己的处理器照常跑 / 兜底 auto 的皮肤照常打开）；真机 KM 页注入两份 `detect.js` 对照：那张 1080×1785 的正文图 `judge()` 由 **true → false**，同页其余 12 张图结论完全不变；阮一峰周刊 416 复验 30 张正文图仍全部 true |
+
 ## 写新条目时
 
 1. **先复现**：在真实页面上点一次，确认是误判还是漏判，别凭截图猜。

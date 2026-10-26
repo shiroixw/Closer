@@ -8,6 +8,8 @@
 //   sync   点击同步挂查看器     → 我们让位，一个节点都不加
 //   late   800ms 后才挂查看器   → 我们先开，1200ms 内自己关掉
 //   card   图片被声明成可点区域 → 判断器拦住（cursor:pointer）
+//   cursor 自定义光标 + pointer 兜底 → 判断器拦住（cases 011 / D34），页面处理器照常跑
+//   skin   自定义光标 + auto 兜底 → 只是皮肤，我们照常开
 //   square 正方形小图           → 判断器拦住（正方形且短边 < 600）
 //   zoom   点击就地放大这张图   → 让位检测第 5 判据拦住（图自己的属性）
 //   box    放大写在容器上       → 第 5 判据拦住（容器的属性）
@@ -75,6 +77,7 @@ function makePng(w, h) {
 }
 const PNG = makePng(900, 700);
 const SQUARE = makePng(300, 300); // 二维码 / 头像的典型尺寸
+const CURSOR = makePng(32, 32); // 自定义光标要真能解码，否则 Chrome 会往 console 报错
 
 /* ---------- 页面 ---------- */
 
@@ -90,6 +93,10 @@ const PAGE = `<!doctype html>
   .case img { width: 420px; display: block; }
   /* 声明成可点区域的卡片：新判据要拦住它 */
   .case.clickable img { cursor: pointer; }
+  /* km 调查页的写法：自定义光标 + pointer 兜底（cases 011）。同一张图再给一个
+     兜底 auto 的皮肤版本，用来钉住「只认结尾」这条边界。 */
+  #cursor { cursor: url("/cursor.png") 2 2, pointer; }
+  #skin { cursor: url("/cursor.png") 2 2, auto; }
   .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 99999;
     display: grid; place-items: center; }
   /* 放大写在容器上：图自己的属性一个字都不变 */
@@ -102,6 +109,8 @@ const PAGE = `<!doctype html>
 <div class="case"><h3>sync — 点击同步挂查看器</h3><img id="sync" src="/photo.png" alt="sync"></div>
 <div class="case"><h3>late — 800ms 后才挂查看器</h3><img id="late" src="/photo.png" alt="late"></div>
 <div class="case clickable"><h3>card — 图片被声明成可点区域</h3><img id="card" src="/photo.png" alt="card"></div>
+<div class="case"><h3>cursor — 自定义光标 + pointer 兜底（km 形态）</h3><img id="cursor" src="/photo.png" alt="cursor"></div>
+<div class="case"><h3>skin — 自定义光标 + auto 兜底（只是皮肤）</h3><img id="skin" src="/photo.png" alt="skin"></div>
 <div class="case"><h3>square — 正方形小图（二维码 / 头像）</h3><img id="square" src="/square.png" alt="square"></div>
 <div class="case"><h3>zoom — 点击后页面就地放大这张图</h3><img id="zoom" src="/photo.png" alt="zoom"></div>
 <div class="case"><h3>box — 点击后页面把装着图的容器放大</h3><div id="box"><img src="/photo.png" alt="box"></div></div>
@@ -132,11 +141,22 @@ document.getElementById('zoom').addEventListener('click', () => {
 document.getElementById('box').addEventListener('click', () => {
   document.getElementById('box').classList.toggle('zoomed');
 });
+// km 调查页的形态：点击由 JS 处理，页面自己开新标签页——DOM 上不留任何痕迹，
+// 让位五判据全哑。桩里用「只记一个 JS 变量」复刻同一件事（真开标签页会污染测试）。
+document.getElementById('cursor').addEventListener('click', () => {
+  window.__km = (window.__km || 0) + 1;
+});
 </script>`;
 
 const server = http
   .createServer((req, res) => {
-    const img = req.url.startsWith('/square.png') ? SQUARE : req.url.startsWith('/photo.png') ? PNG : null;
+    const img = req.url.startsWith('/square.png')
+      ? SQUARE
+      : req.url.startsWith('/cursor.png')
+        ? CURSOR
+        : req.url.startsWith('/photo.png')
+          ? PNG
+          : null;
     if (img) {
       res.writeHead(200, { 'content-type': 'image/png', 'content-length': img.length, 'cache-control': 'no-store' });
       return res.end(img);
@@ -330,6 +350,21 @@ await sleep(600);
 const cardOurs = await has();
 check('C1 cursor:pointer 声明的可点区域：不接管', cardOurs === false);
 check('C2 也没有给页面留下任何东西', (await hasLightbox()) === false);
+
+/* --- cursor：自定义光标 + pointer 兜底（km 调查页，cases 011 / D34） --- */
+
+await reload();
+await clickImage('cursor');
+await sleep(600);
+check('K1 自定义光标兜底 pointer：判断器拦住，不接管', (await has()) === false);
+check('K2 页面自己的处理器照常跑（没被掐掉）', (await ev('window.__km === 1')) === true);
+
+/* --- skin：自定义光标 + auto 兜底，只是皮肤 --- */
+
+await reload();
+await clickImage('skin');
+await sleep(600);
+check('K3 兜底 auto 的自定义光标：照常打开（只认结尾）', (await has()) === true);
 
 /* --- square：正方形小图（二维码 / 头像） --- */
 
