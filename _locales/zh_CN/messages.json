@@ -87,19 +87,19 @@
     "message": "图片信息"
   },
   "infoTitle": {
-    "message": "图片信息 (I)"
+    "message": "图片信息 (I / ·)"
   },
   "copyLabel": {
     "message": "复制图片"
   },
   "copyTitle": {
-    "message": "复制图片（⇧ 点击：复制地址）"
+    "message": "复制图片（Ctrl/⌘ C；⇧ 点击：复制地址）"
   },
   "saveLabel": {
     "message": "保存图片"
   },
   "saveTitle": {
-    "message": "保存图片"
+    "message": "保存图片（Ctrl/⌘ S）"
   },
   "closeLabel": {
     "message": "关闭"
@@ -134,6 +134,15 @@
   },
   "copyTooLarge": {
     "message": "图片过大，已改为复制地址"
+  },
+  "copyDone": {
+    "message": "已复制"
+  },
+  "copyAddrDone": {
+    "message": "已复制地址"
+  },
+  "saveDone": {
+    "message": "已开始下载"
   },
   "copyFailed": {
     "message": "复制失败"

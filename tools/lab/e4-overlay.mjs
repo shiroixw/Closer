@@ -508,6 +508,75 @@ if (!ready) {
     `${JSON.stringify(bv)} open=${bannerOpen.value}`
   );
   await evalx(`document.getElementById('bleed').remove()`);
+
+  // 9. 快捷键：· 开详情；Ctrl/⌘ + C 复制、Ctrl/⌘ + S 下载（后两个必须先吃掉浏览器原生行为）。
+  //    剪贴板与下载在 headless 里既不稳定也不可观测，所以把落地函数换成桩：
+  //    这里验的是「键 → 动作 → 提示」这条接线，以及 defaultPrevented。
+  await evalx(`(() => {
+    const img = document.getElementById('big');
+    const r = img.getBoundingClientRect();
+    img.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true, button: 0,
+      clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+    }));
+    Closer.bytes = async () => ({ buf: new ArrayBuffer(8), mime: 'image/png' });
+    Closer.copyImage = async () => 'image';
+    Closer.saveImage = async () => {};
+    return Closer.overlay.isOpen();
+  })()`);
+  await sleep(420);
+
+  // 桩页面没有 chrome.i18n，Closer.t 按 core.js 的约定退回 key 本身，
+  // 所以这里比的正是 key 名：copyDone / saveDone 只可能由成功路径写出来。
+  const hotkeys = await evalx(`(async () => {
+    const sr = document.getElementById('closer').shadowRoot;
+    const panel = sr.querySelector('.panel');
+    const toast = sr.querySelector('.toast');
+    const fire = (init) => {
+      const ev = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      window.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    const settle = () => new Promise((r) => setTimeout(r, 60));
+
+    const dot = fire({ key: '·' });
+    const dotOpen = !panel.hidden;
+    fire({ key: '·' });
+    const dotClosed = panel.hidden;
+
+    const copyPrevented = fire({ key: 'c', ctrlKey: true });
+    await settle();
+    const copy = { toast: toast.textContent, on: toast.classList.contains('on') };
+
+    const savePrevented = fire({ key: 's', ctrlKey: true });
+    await settle();
+    const save = { toast: toast.textContent, on: toast.classList.contains('on') };
+
+    return { dot, dotOpen, dotClosed, copyPrevented, copy, savePrevented, save, stillOpen: Closer.overlay.isOpen() };
+  })()`);
+
+  const hk = hotkeys.value || {};
+  check('· 键打开详情面板（页面拿不到这个键）', hk.dot === true && hk.dotOpen === true, JSON.stringify(hk));
+  check('· 键再按一次收起面板', hk.dotClosed === true);
+  check(
+    'Ctrl+C 被吃掉，并提示「已复制」',
+    hk.copyPrevented === true && hk.copy?.toast === 'copyDone' && hk.copy?.on === true,
+    `${JSON.stringify(hk.copy)} prevented=${hk.copyPrevented}`
+  );
+  check(
+    'Ctrl+S 被吃掉，并提示已开始下载',
+    hk.savePrevented === true && hk.save?.toast === 'saveDone' && hk.save?.on === true,
+    `${JSON.stringify(hk.save)} prevented=${hk.savePrevented}`
+  );
+  check('快捷键不关闭 overlay', hk.stillOpen === true);
+
+  await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(480);
+  const afterKeys = await evalx(`({
+    gone: !document.getElementById('closer'),
+    intact: document.documentElement.outerHTML === window.__snap,
+  })`);
+  check('快捷键验完，Esc 关闭且 DOM 仍逐字节一致', afterKeys.value?.gone === true && afterKeys.value?.intact === true);
 }
 
 ws.close();

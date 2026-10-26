@@ -305,12 +305,15 @@ button:hover{background:rgba(63,63,70,.9)}
       // ⇧ 复制地址：纯文本，永不失败
       if (e.shiftKey) {
         await Closer.copyText(m.url);
+        say(Closer.t('copyAddrDone'));
       } else {
         const got = await Closer.bytes(m.url, 'full');
         if (!got?.buf) throw new Error('bytes');
         // 太大时降级成地址：拿到的东西变了，就得说出来（5.4）
         if ((await Closer.copyImage(got, m.url)) === 'address') {
           say(Closer.t('copyTooLarge'));
+        } else {
+          say(Closer.t('copyDone'));
         }
       }
       flash(copyBtn);
@@ -327,6 +330,7 @@ button:hover{background:rgba(63,63,70,.9)}
       if (!got?.buf) throw new Error('bytes');
       await Closer.saveImage(got, Closer.fileName(m.url, m));
       flash(saveBtn);
+      say(Closer.t('saveDone'));
     } catch {
       say(Closer.t('saveFailed'));
     }
@@ -462,9 +466,32 @@ button:hover{background:rgba(63,63,70,.9)}
 
   function onKey(e) {
     if (state !== 'open') return;
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     const k = e.key;
+    const cmd = e.metaKey || e.ctrlKey;
+
+    // ⌘/Ctrl + C、⌘/Ctrl + S：浏览器对这两个组合自有安排（复制选区、另存页面），
+    // 只有 preventDefault 才轮得到我们。⇧ 的语义与点击一致——复制的是图片地址。
+    if (cmd && !e.altKey) {
+      const lower = k.toLowerCase();
+      if (lower === 'c' || lower === 's') {
+        e.preventDefault();
+        wake(); // 对勾画在按钮上，chrome 淡出时必须先叫醒
+        if (lower === 'c') onCopy({ shiftKey: e.shiftKey });
+        else onSave();
+        return;
+      }
+    }
+
+    // 详情：· 键。它要靠输入法或 ⌥⇧9 这类组合才打得出来，所以先认 key、后看修饰键；
+    // 有的布局/输入法把 · 挂在 ` 键上，那时 keydown 只剩 code 可信，再兜一层。
+    if (k === '·' || (!cmd && e.code === 'Backquote')) {
+      e.preventDefault();
+      togglePanel();
+      return;
+    }
+
+    if (cmd || e.altKey) return; // 其余带修饰键的组合交回浏览器
 
     // 空格与方向键不拦，页面会在 overlay 背后滚动——用户看不见，关掉才发现人已经走了
     if (SCROLL_KEYS.has(k)) {
