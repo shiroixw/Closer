@@ -5,8 +5,11 @@
 
 <!-- 文案不写在这里：每一个 data-i18n 都是 _locales/*/messages.json 里的一个 key -->
 
-<h1>Closer</h1>
-<p id="status"><span class="dot off"></span><span id="statusText" data-i18n="statusChecking"></span></p>
+<!-- 标题与状态同一行：状态只是副信息，不值得单独占一行（288px 的窗口寸土寸金） -->
+<header class="head">
+  <h1>Closer</h1>
+  <p id="status"><span class="dot off"></span><span id="statusText" data-i18n="statusChecking"></span></p>
+</header>
 
 <div class="row" id="permRow" hidden>
   <span class="host" data-i18n="needsAccess"></span>

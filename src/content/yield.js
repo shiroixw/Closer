@@ -187,6 +187,10 @@ Closer.remember = function (node, anchor) {
  */
 Closer.shelled = function (img) {
   if (document.fullscreenElement) return true; // 全屏时我们开了也看不见
+  // 这页上打开过一次却看不见自己（cases 013）：后面每次点击都只会被吃掉，干脆退场。
+  // 一次观测换整页让位，只到刷新为止——它是观测不是猜测，不落进暂停列表，也不跨页。
+  // 点击与悬停光标都经过这里，所以两边口径一致：不开，也不给 zoom-in。
+  if (Closer.state.unseen) return true;
 
   const shell = Closer.state.shell;
   if (shell) {

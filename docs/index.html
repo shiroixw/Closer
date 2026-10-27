@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Closer — Click any image to view it full size</title>
+<meta name="description" content="A Chrome extension: click an image on any web page to see it full size. Skips icons, avatars and linked images. Collects no data. MIT licensed.">
+<meta property="og:title" content="Closer — Click any image to view it full size">
+<meta property="og:description" content="Click an image on any web page to see it full size. Collects no data.">
+<meta property="og:image" content="https://closer-viewer.vercel.app/assets/hero.jpg">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect x='4' y='4' width='120' height='120' rx='30' fill='%23121214'/%3E%3Cg fill='%23f2f2f5'%3E%3Cpath fill-rule='evenodd' d='M38 24h52a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H38a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14zm7 14a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V45a7 7 0 0 0-7-7z'/%3E%3Ccircle cx='52' cy='54' r='7'/%3E%3Cpath d='M36 92 64 56 92 92z'/%3E%3C/g%3E%3C/svg%3E">
+
+<!--
+  Closer 的官网。和扩展守同一套规矩：
+  · 手写、单文件、无构建、无框架（宪法第五条）。View source 看到的就是写出来的版本。
+  · 不引任何第三方资源：无字体 CDN、无统计、无外链脚本（第四条）。这一页自己不能成为隐私政策的反例。
+  · 中英两种写在同一份 DOM 里，按 <html lang> 只显示一种。默认按浏览器语言选，页头有切换（D40）。
+    没有 JS 时显示英文，切换按钮也不出现。
+  页面上的读数（1600 × 1000、JPEG · 203 KB）就是 assets/hero.jpg 的真实值，
+  「显示 W × H」与「在 … 上暂停」由下面的脚本按 Closer 的同一算法现场算出。
+
+  文案口径：短句、说具体的事，不写口号。判断清单与快捷键是 detect.js 的 judge() 与
+  overlay.js 的 onKey 的转述，改判据或键位时这里要跟着改（没有自动检查）。
+-->
+
+<link rel="alternate" hreflang="en" href="https://closer-viewer.vercel.app/?lang=en">
+<link rel="alternate" hreflang="zh-CN" href="https://closer-viewer.vercel.app/?lang=zh">
+<link rel="alternate" hreflang="x-default" href="https://closer-viewer.vercel.app/">
+
+<script>
+  // 语言的来源，先到先得：
+  //   1. 链接里的 ?lang=zh / ?lang=en：分享出去的链接要让对方看到同一种语言；
+  //   2. 访客上次按过的切换（只存在这台机器的 localStorage，隐私政策页共用同一个 key）；
+  //   3. 浏览器语言，口径与扩展的 _locales 一致：只有简体中文落到 zh-CN，其余（含 zh-TW）回英文。
+  // 写在 <head> 里同步执行：等到 DOMContentLoaded 再切，首屏会先闪一下另一种语言。
+  window.CLOSER_LANG = (() => {
+    const norm = (v) => (/^zh/i.test(v || '') ? 'zh-CN' : /^en/i.test(v || '') ? 'en' : '');
+    let saved = '';
+    try { saved = localStorage.getItem('closer-site-lang') || ''; } catch {} // 隐私模式下可能直接抛
+    return (
+      norm(new URLSearchParams(location.search).get('lang')) ||
+      norm(saved) ||
+      (/^zh(-(cn|sg|hans)\b|$)/i.test(navigator.language || '') ? 'zh-CN' : 'en')
+    );
+  })();
+  document.documentElement.lang = window.CLOSER_LANG;
+  if (window.CLOSER_LANG === 'zh-CN') document.title = 'Closer — 点任意图片，按原尺寸查看';
+</script>
+
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --card: #131316;
+    --line: #26262a;
+    --text: #f4f4f5;
+    --dim: #a1a1aa;
+    --faint: #71717a;
+    --accent: #f2f2f5;
+    --ok: #4ade80;
+    --no: #f87171;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  /* 两种语言并排写在 DOM 里，按 <html lang> 只留一种。
+     只管 <body> 里的东西：扩展、翻译插件这类东西会把节点挂在 <html> 下并带上自己的 lang，
+     写成 `html[lang] [lang]` 会把它们一起藏掉——Closer 自己就被这样藏过（cases 013）。 */
+  html[lang="zh-CN"] body [lang="en"],
+  html[lang="en"] body [lang="zh-CN"] { display: none !important; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.65 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; }
+  code, kbd { font-family: var(--mono); }
+  code { font-size: .88em; color: #d4d4d8; background: #1c1c20; padding: 1px 6px; border-radius: 5px; }
+  kbd {
+    display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px;
+    font-size: 12px; color: var(--text); background: #18181b;
+    border: 1px solid #2f2f35; border-bottom-width: 2px; border-radius: 6px;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── 页头 ─────────────────────────────── */
+  .top {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11, 11, 12, .78);
+    backdrop-filter: saturate(140%) blur(12px);
+    -webkit-backdrop-filter: saturate(140%) blur(12px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s ease;
+  }
+  .top.scrolled { border-bottom-color: var(--line); }
+  .top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; text-decoration: none; letter-spacing: -.01em; }
+  .brand svg { width: 28px; height: 28px; display: block; }
+  .nav { display: flex; align-items: center; gap: 22px; font-size: 14px; }
+  .nav a { color: var(--dim); text-decoration: none; transition: color .15s ease; }
+  .nav a:hover { color: var(--text); }
+
+  /* 语言切换：两档并排，当前那档亮，整颗按钮点一下就换到另一档 */
+  .lang {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    border: 1px solid var(--line); font-size: 13px; line-height: 1; color: var(--faint);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .lang:hover { border-color: #3f3f46; background: #141417; }
+  .lang:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .lang i { font-style: normal; color: #3f3f46; }
+  .lang span { transition: color .15s ease; }
+  html[lang="en"] .lang [data-l="en"],
+  html[lang="zh-CN"] .lang [data-l="zh-CN"] { color: var(--text); font-weight: 600; }
+
+  /* ── 首屏 ─────────────────────────────── */
+  .hero { padding-top: 88px; padding-bottom: 40px; text-align: center; }
+  .eyebrow { display: inline-block; font-size: 13px; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; margin-bottom: 26px; }
+  h1 {
+    margin: 0 auto; max-width: 820px;
+    font-size: clamp(38px, 6.2vw, 68px); line-height: 1.06; letter-spacing: -.035em; font-weight: 650;
+  }
+  html[lang="zh-CN"] h1 { letter-spacing: -.01em; line-height: 1.15; }
+  .lede { margin: 24px auto 0; max-width: 600px; font-size: clamp(17px, 2vw, 19px); color: var(--dim); }
+  .cta { margin-top: 34px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 44px; padding: 0 20px; border-radius: 11px;
+    font-size: 15px; font-weight: 550; text-decoration: none;
+    border: 1px solid var(--line); background: #17171a; color: var(--text);
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+  }
+  .btn:hover { background: #1f1f23; border-color: #34343a; }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); color: #0b0b0c; border-color: var(--accent); }
+  .btn.primary:hover { background: #fff; }
+  .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .facts { margin: 26px 0 0; padding: 0; list-style: none; display: flex; gap: 8px 22px; justify-content: center; flex-wrap: wrap; font-size: 13.5px; color: var(--dim); }
+  .facts li::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ok); margin-right: 8px; vertical-align: middle; position: relative; top: -1px; }
+
+  /* ── 演示：按扩展里 overlay.js 的同一套数值画出来的查看器 ── */
+  .demo { margin: 56px auto 0; }
+  .viewer {
+    position: relative; overflow: hidden;
+    aspect-ratio: 16 / 10; border-radius: 18px;
+    background: #0b0b0c; border: 1px solid var(--line);
+    box-shadow: 0 40px 120px -40px rgba(0, 0, 0, .9), 0 0 0 1px rgba(255, 255, 255, .02) inset;
+    color: #f5f5f5; font: 13px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    text-align: left;
+  }
+  .viewer .photo {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 80%; height: auto; display: block; max-width: none;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+    transition: width .32s cubic-bezier(.2, .8, .2, 1), box-shadow .32s ease;
+  }
+  .viewer .bar {
+    position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; pointer-events: none;
+    transition: opacity .18s ease, visibility 0s;
+  }
+  /* 四颗按钮都是真的：i 开关面板，复制 / 保存 / 关闭与扩展里做同样的事（D40） */
+  .viewer .chip {
+    all: unset; box-sizing: border-box; display: grid; place-items: center;
+    width: 32px; height: 32px; border-radius: 9px;
+    background: rgba(24, 24, 27, .62); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    color: inherit; cursor: pointer; pointer-events: auto;
+    font: 600 15px/1 ui-sans-serif, system-ui, sans-serif;
+    transition: background .14s ease, color .14s ease;
+  }
+  .viewer .chip:hover { background: rgba(63, 63, 70, .9); }
+  .viewer .chip:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 2px; }
+  .viewer .chip.done { color: #4ade80; }
+  .viewer .actions { display: flex; gap: 4px; }
+  .viewer .chip svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .viewer .toast {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); padding: 7px 13px;
+    border-radius: 9px; background: rgba(24, 24, 27, .9); font-size: 12px; white-space: nowrap;
+    opacity: 0; transition: opacity .14s ease; pointer-events: none;
+  }
+  .viewer .toast.on { opacity: 1; }
+
+  /* 关闭后：图缩回「页面里的一张图」，工具条与面板退场；点图再打开。
+     visibility 只在「关」的方向延迟（等淡出播完）；「开」的方向必须立刻可见，
+     否则过渡第 0 帧仍是 hidden，重开时把焦点还给关闭按钮会落空（实测落到 body）。 */
+  .viewer .panel { transition: opacity .18s ease, visibility 0s; }
+  .demo.closed .bar,
+  .demo.closed .panel { opacity: 0; visibility: hidden; transition: opacity .18s ease, visibility 0s .18s; }
+  .demo.closed .photo { width: 44%; cursor: zoom-in; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
+  .demo.closed .photo:focus-visible { outline: 2px solid #7cc4ff; outline-offset: 4px; }
+  .demo .when-closed,
+  .demo.closed .when-open { display: none; }
+  .demo.closed .when-closed { display: inline; }
+  @media (prefers-reduced-motion: reduce) {
+    .viewer .photo, .viewer .bar, .viewer .panel { transition: none; }
+  }
+  .viewer .panel {
+    position: absolute; top: 56px; left: 14px; width: 232px; padding: 12px 14px; border-radius: 12px;
+    background: rgba(24, 24, 27, .86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+    animation: pop .16s cubic-bezier(.2, .8, .2, 1);
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .viewer .dims { font-size: 15px; font-weight: 500; letter-spacing: .01em; }
+  .viewer .sub { color: #a1a1aa; font-size: 12px; margin-top: 2px; }
+  .viewer hr { border: 0; border-top: 1px solid rgba(255, 255, 255, .1); margin: 10px 0 8px; }
+  .viewer .pause { color: #a1a1aa; font-size: 12px; }
+  .caption { margin: 16px auto 0; text-align: center; font-size: 13.5px; color: var(--faint); }
+
+  /* ── 通用区块 ─────────────────────────── */
+  section { padding: 104px 0 0; scroll-margin-top: 40px; }
+  .kicker { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin: 0 0 14px; }
+  html[lang="zh-CN"] .kicker { letter-spacing: .12em; }
+  h2 { margin: 0; font-size: clamp(28px, 3.6vw, 40px); line-height: 1.15; letter-spacing: -.025em; font-weight: 650; max-width: 760px; }
+  html[lang="zh-CN"] h2 { letter-spacing: 0; line-height: 1.3; }
+  .intro { margin: 16px 0 0; max-width: 640px; color: var(--dim); font-size: 17px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 26px; }
+  .card h3 { margin: 0 0 12px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+
+  /* 会打开 / 不会打开 */
+  .verdict { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .dot svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .dot.yes { background: rgba(74, 222, 128, .12); color: var(--ok); }
+  .dot.no { background: rgba(248, 113, 113, .12); color: var(--no); }
+  .verdict ul { margin: 0; padding: 0; list-style: none; }
+  .verdict li { padding: 9px 0; border-top: 1px solid #1e1e22; color: #d4d4d8; font-size: 15px; }
+  .verdict li:first-child { border-top: 0; padding-top: 0; }
+  .note { margin: 18px 0 0; color: var(--dim); font-size: 15px; }
+
+  /* 查看器：四格 + 一行快捷键 */
+  .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .cell { background: var(--bg); padding: 26px 24px 28px; }
+  .cell .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #17171a; border: 1px solid var(--line); margin-bottom: 16px; }
+  .cell .ic svg { width: 18px; height: 18px; fill: none; stroke: #e4e4e7; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .cell h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  .cell p { margin: 0; color: var(--dim); font-size: 14.5px; }
+  .keys { margin: 22px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-size: 14px; color: var(--dim); }
+  .keys > span { display: inline-flex; align-items: center; gap: 6px; }
+  .keys .label { color: var(--faint); }
+
+  /* 隐私 */
+  .privacy { margin-top: 40px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .privacy .card h3 { margin: 0; }
+  .privacy .card p { margin: 6px 0 0; color: var(--dim); font-size: 14.5px; }
+  .links { margin-top: 24px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 15px; }
+  .links a { color: var(--text); text-decoration: none; border-bottom: 1px solid #3f3f46; padding-bottom: 1px; transition: border-color .15s ease; }
+  .links a:hover { border-bottom-color: var(--text); }
+
+  /* 安装 */
+  .steps { margin: 40px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; font-size: 14.5px; color: var(--dim); }
+  .steps li::before { content: counter(s); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #0b0b0c; font-weight: 650; font-size: 14px; margin-bottom: 14px; }
+  .steps strong { display: block; color: var(--text); font-weight: 600; font-size: 15.5px; margin-bottom: 4px; }
+  .aside { margin-top: 18px; color: var(--faint); font-size: 14px; }
+  .aside + .aside { margin-top: 6px; }
+
+  /* 页脚 */
+  footer { margin-top: 120px; border-top: 1px solid var(--line); padding: 30px 0 48px; color: var(--faint); font-size: 13.5px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer nav { display: flex; gap: 20px; }
+  footer a { text-decoration: none; color: var(--dim); }
+  footer a:hover { color: var(--text); }
+
+  @media (max-width: 860px) {
+    .grid, .steps { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    .nav { gap: 16px; }
+    .nav a.opt { display: none; }
+    .hero { padding-top: 56px; }
+    section { padding-top: 80px; }
+    .verdict, .grid, .privacy, .steps { grid-template-columns: 1fr; }
+    .viewer { aspect-ratio: 4 / 3; }
+    .viewer .photo { width: 92%; }
+    .demo.closed .photo { width: 60%; }
+    .viewer .panel { width: 196px; padding: 10px 12px; }
+  }
+</style>
+
+<body>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 128 128" aria-hidden="true"><rect x="4" y="4" width="120" height="120" rx="30" fill="#121214" stroke="#2a2a30" stroke-width="2"/><g fill="#f2f2f5"><path fill-rule="evenodd" d="M38 24h52a14 14 0 0 1 14 14v52a14 14 0 0 1-14 14H38a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14zm7 14a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h38a7 7 0 0 0 7-7V45a7 7 0 0 0-7-7z"/><circle cx="52" cy="54" r="7"/><path d="M36 92 64 56 92 92z"/></g></svg>
+      Closer
+    </a>
+    <nav class="nav">
+      <a class="opt" href="#judge"><span lang="en">What opens</span><span lang="zh-CN">打开哪些图</span></a>
+      <a class="opt" href="#install"><span lang="en">Install</span><span lang="zh-CN">安装</span></a>
+      <a href="privacy"><span lang="en">Privacy</span><span lang="zh-CN">隐私</span></a>
+      <a href="https://github.com/shiroixw/Closer">GitHub</a>
+      <!-- 两个标签都不带 lang 属性：带了就会被上面「只留一种语言」的规则藏掉一半 -->
+      <button class="lang" id="lang" type="button" hidden><span data-l="en">EN</span><i>/</i><span data-l="zh-CN">中</span></button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="wrap hero">
+  <span class="eyebrow"><span lang="en">Chrome extension · v0.1</span><span lang="zh-CN">Chrome 扩展 · v0.1</span></span>
+  <h1>
+    <span lang="en">Click an image.<br>See it full size.</span>
+    <span lang="zh-CN">点一下图片，<br>看清原图。</span>
+  </h1>
+  <p class="lede">
+    <span lang="en">Most images on the web are shown smaller than they are. Click one and Closer opens it full size, right on the page. Icons, avatars and linked images are left alone.</span>
+    <span lang="zh-CN">网页上的图片大多被缩小了。点一下，Closer 就在当前页面打开原图。图标、头像和带链接的图，它不会碰。</span>
+  </p>
+  <div class="cta">
+    <a class="btn primary" href="#install">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg>
+      <span lang="en">Install</span><span lang="zh-CN">安装</span>
+    </a>
+    <a class="btn" href="https://github.com/shiroixw/Closer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7-5 5 5 5"/><path d="m15 7 5 5-5 5"/></svg>
+      <span lang="en">Source code</span><span lang="zh-CN">源码</span>
+    </a>
+  </div>
+  <ul class="facts">
+    <li><span lang="en">Collects no data</span><span lang="zh-CN">不收集数据</span></li>
+    <li><span lang="en">No sign-up</span><span lang="zh-CN">不用注册</span></li>
+    <li><span lang="en">Open source, MIT</span><span lang="zh-CN">开源，MIT 许可</span></li>
+  </ul>
+
+  <figure class="demo" id="demo">
+    <div class="viewer">
+      <img class="photo" id="hero" src="assets/hero.jpg" width="1600" height="1000" alt="A mountain road under low clouds" fetchpriority="high" decoding="async">
+      <div class="bar">
+        <button class="chip" id="info" type="button" aria-expanded="false" aria-controls="panel" title="Image info">i</button>
+        <div class="actions">
+          <button class="chip" id="copy" type="button" title="Copy image (⇧ click: copy address)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></button>
+          <a class="chip" id="save" href="assets/hero.jpg" download="hero.jpg" title="Save image"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg></a>
+          <button class="chip" id="close" type="button" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+      </div>
+      <!-- 默认收起，和扩展一致（overlay.js 里 .panel 也是 hidden 起步）：面板是按需看的，不该先挡住图 -->
+      <div class="panel" id="panel" hidden>
+        <div class="dims">1600 × 1000</div>
+        <div class="sub"><span lang="en">shown</span><span lang="zh-CN">显示</span> <span id="shown">1280 × 800</span></div>
+        <div class="sub">8:5 · 1.6 MP</div>
+        <div class="sub">JPEG · 203 KB</div>
+        <hr>
+        <div class="pause"><span lang="en">Pause on</span><span lang="zh-CN">在</span> <span class="site">closer-viewer.vercel.app</span><span lang="zh-CN"> 上暂停</span></div>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <figcaption class="caption">
+      <span class="when-open"><span lang="en">Already have Closer? Click the photo and compare.</span><span lang="zh-CN">已经装了 Closer？点这张照片对比一下。</span></span>
+      <span class="when-closed"><span lang="en">Click the photo to open it again.</span><span lang="zh-CN">点照片重新打开。</span></span>
+    </figcaption>
+  </figure>
+</div>
+
+<section id="judge">
+  <div class="wrap">
+    <p class="kicker"><span lang="en">What opens</span><span lang="zh-CN">打开哪些图</span></p>
+    <h2>
+      <span lang="en">Only the ones worth a closer look</span>
+      <span lang="zh-CN">只打开值得放大的图</span>
+    </h2>
+    <p class="intro">
+      <span lang="en">A page can have dozens of images. Most of them aren't meant to be opened.</span>
+      <span lang="zh-CN">一个页面上可能有几十张图，大部分并不需要放大看。</span>
+    </p>
+
+    <div class="verdict">
+      <div class="card">
+        <h3><span class="dot yes"><svg viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></svg></span><span lang="en">Opens</span><span lang="zh-CN">会打开</span></h3>
+        <ul>
+          <li><span lang="en">Photos shrunk to fit an article</span><span lang="zh-CN">文章里被缩小的照片</span></li>
+          <li><span lang="en">Screenshots and charts</span><span lang="zh-CN">截图、图表</span></li>
+          <li><span lang="en">Images that link to their own file</span><span lang="zh-CN">链接指向图片本身的图</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="dot no"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></svg></span><span lang="en">Leaves alone</span><span lang="zh-CN">不会打开</span></h3>
+        <ul>
+          <li><span lang="en">Icons, logos and banners</span><span lang="zh-CN">图标、logo、横幅</span></li>
+          <li><span lang="en">Avatars and QR codes</span><span lang="zh-CN">头像、二维码</span></li>
+          <li><span lang="en">Images inside links, buttons and clickable cards</span><span lang="zh-CN">链接、按钮、可点击卡片里的图</span></li>
+          <li><span lang="en">Page backgrounds</span><span lang="zh-CN">网页背景图</span></li>
+          <li><span lang="en">Images the site already opens in its own viewer</span><span lang="zh-CN">网站自己会放大的图</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">
+      <span lang="en">When it isn't sure, it does nothing. You can still right-click an image it skipped.</span>
+      <span lang="zh-CN">拿不准的时候它就不打开。漏掉的图，右键仍然可以照常打开。</span>
+    </p>
+  </div>
+</section>
+
+<section id="viewer">
+  <div class="wrap">
+    <p class="kicker"><span lang="en">The viewer</span><span lang="zh-CN">查看器</span></p>
+    <h2>
+      <span lang="en">Opens on the page. Close it and nothing has moved.</span>
+      <span lang="zh-CN">在当前页面打开，关掉后页面不变</span>
+    </h2>
+    <p class="intro">
+      <span lang="en">No new tab. Press Esc and you're back where you were, at the same scroll position.</span>
+      <span lang="zh-CN">不开新标签页。按 Esc 关闭，还停在原来看到的位置。</span>
+    </p>
+
+    <div class="grid">
+      <div class="cell">
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4M11 8.5v5M8.5 11h5"/></svg></div>
+        <h3><span lang="en">Zoom and pan</span><span lang="zh-CN">缩放和拖动</span></h3>
+        <p><span lang="en">Scroll to zoom, drag to move, double-click for 1:1.</span><span lang="zh-CN">滚轮缩放，按住拖动，双击切到 1:1。</span></p>
+      </div>
+      <div class="cell">
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg></div>
+        <h3><span lang="en">Image info</span><span lang="zh-CN">图片信息</span></h3>
+        <p><span lang="en">Real size, displayed size, format and file size.</span><span lang="zh-CN">原始尺寸、显示尺寸、格式和文件大小。</span></p>
+      </div>
+      <div class="cell">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></div>
+        <h3><span lang="en">Copy and save</span><span lang="zh-CN">复制和保存</span></h3>
+        <p><span lang="en">Copy the image, or save the original file.</span><span lang="zh-CN">复制图片，或者保存原文件。</span></p>
+      </div>
+      <div class="cell">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 12h16M12 4v16"/></svg></div>
+        <h3><span lang="en">Three backdrops</span><span lang="zh-CN">三种背景</span></h3>
+        <p><span lang="en">Dark, light, or a checkerboard for transparent images.</span><span lang="zh-CN">深色、浅色，以及看透明图用的棋盘格。</span></p>
+      </div>
+    </div>
+
+    <p class="keys">
+      <span class="label" lang="en">Shortcuts</span><span class="label" lang="zh-CN">快捷键</span>
+      <span><kbd>Esc</kbd><span lang="en">close</span><span lang="zh-CN">关闭</span></span>
+      <span><kbd>·</kbd><kbd>I</kbd><span lang="en">info</span><span lang="zh-CN">信息</span></span>
+      <span><kbd>⌘/Ctrl C</kbd><span lang="en">copy</span><span lang="zh-CN">复制</span></span>
+      <span><kbd>⌘/Ctrl S</kbd><span lang="en">save</span><span lang="zh-CN">保存</span></span>
+      <span><kbd>0</kbd><kbd>1</kbd><span lang="en">fit / 1:1</span><span lang="zh-CN">适应窗口 / 1:1</span></span>
+      <span><kbd>+</kbd><kbd>−</kbd><span lang="en">zoom</span><span lang="zh-CN">缩放</span></span>
+      <span><kbd>R</kbd><kbd>F</kbd><span lang="en">rotate / flip</span><span lang="zh-CN">旋转 / 镜像</span></span>
+      <span><kbd>B</kbd><span lang="en">backdrop</span><span lang="zh-CN">背景</span></span>
+    </p>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="wrap">
+    <p class="kicker"><span lang="en">Privacy</span><span lang="zh-CN">隐私</span></p>
+    <h2>
+      <span lang="en">It doesn't collect your data</span>
+      <span lang="zh-CN">不收集你的任何数据</span>
+    </h2>
+    <p class="intro">
+      <span lang="en">Closer needs access to every site you visit, so here is what it does with it.</span>
+      <span lang="zh-CN">Closer 需要在你访问的所有网站上运行，所以把它做什么说清楚。</span>
+    </p>
+    <div class="privacy">
+      <div class="card">
+        <h3><span lang="en">No tracking</span><span lang="zh-CN">没有统计和上报</span></h3>
+        <p><span lang="en">No analytics, no crash reports, no account, no server.</span><span lang="zh-CN">没有数据统计，没有崩溃上报，没有账号，也没有服务器。</span></p>
+      </div>
+      <div class="card">
+        <h3><span lang="en">One kind of request</span><span lang="zh-CN">只请求你正在看的图</span></h3>
+        <p><span lang="en">It fetches the image you opened to read its file size. Nothing else.</span><span lang="zh-CN">为了显示文件大小，它会读取你打开的那张图，不请求别的东西。</span></p>
+      </div>
+      <div class="card">
+        <h3><span lang="en">Doesn't read the page</span><span lang="zh-CN">不读网页内容</span></h3>
+        <p><span lang="en">Only the image you click. Not the text, forms, history or cookies.</span><span lang="zh-CN">只看你点的那张图，不读正文、表单、浏览记录和 Cookie。</span></p>
+      </div>
+      <div class="card">
+        <h3><span lang="en">Off until you allow it</span><span lang="zh-CN">你同意后才开始工作</span></h3>
+        <p><span lang="en">After installing, it waits for your OK. You can take it back any time.</span><span lang="zh-CN">装好后要你点一下授权才会生效，随时可以撤销。</span></p>
+      </div>
+    </div>
+    <div class="links">
+      <a href="privacy"><span lang="en">Privacy policy</span><span lang="zh-CN">隐私政策</span> →</a>
+      <a href="https://github.com/shiroixw/Closer"><span lang="en">Source code (not minified, easy to read)</span><span lang="zh-CN">源码（没有压缩，可以直接读）</span> →</a>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <p class="kicker"><span lang="en">Install</span><span lang="zh-CN">安装</span></p>
+    <h2>
+      <span lang="en">Four steps</span>
+      <span lang="zh-CN">四步装好</span>
+    </h2>
+    <p class="intro">
+      <span lang="en">It isn't on the Chrome Web Store yet, so for now you load it from the source.</span>
+      <span lang="zh-CN">还没上架 Chrome 应用商店，目前需要从源码加载。</span>
+    </p>
+    <ol class="steps">
+      <li>
+        <strong lang="en">Download</strong><strong lang="zh-CN">下载</strong>
+        <span lang="en"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">Download the ZIP</a> and unzip it.</span>
+        <span lang="zh-CN"><a href="https://github.com/shiroixw/Closer/archive/refs/heads/main.zip">下载 ZIP</a> 并解压。</span>
+      </li>
+      <li>
+        <strong lang="en">Open extensions</strong><strong lang="zh-CN">打开扩展页</strong>
+        <span lang="en">Go to <code>chrome://extensions</code> and turn on Developer mode.</span>
+        <span lang="zh-CN">打开 <code>chrome://extensions</code>，开启右上角的「开发者模式」。</span>
+      </li>
+      <li>
+        <strong lang="en">Load it</strong><strong lang="zh-CN">加载</strong>
+        <span lang="en">Click Load unpacked and choose the unzipped folder.</span>
+        <span lang="zh-CN">点「加载已解压的扩展程序」，选择解压出来的文件夹。</span>
+      </li>
+      <li>
+        <strong lang="en">Allow it</strong><strong lang="zh-CN">授权</strong>
+        <span lang="en">On the welcome page that opens, click Allow on all sites.</span>
+        <span lang="zh-CN">在自动打开的欢迎页里，点「在所有站点上允许」。</span>
+      </li>
+    </ol>
+    <p class="aside"><span lang="en">Requires Chrome 110 or later.</span><span lang="zh-CN">需要 Chrome 110 或更高版本。</span></p>
+    <p class="aside">
+      <span lang="en">Run a website? Add <code>data-closer-ignore</code> to an image or its container and Closer won't open it.</span>
+      <span lang="zh-CN">做网站的话：给图片或它的外层元素加上 <code>data-closer-ignore</code>，Closer 就不会打开它。</span>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><span lang="en">Closer · MIT License</span><span lang="zh-CN">Closer · MIT 许可</span></span>
+    <nav>
+      <a href="privacy"><span lang="en">Privacy</span><span lang="zh-CN">隐私政策</span></a>
+      <a href="https://github.com/shiroixw/Closer/issues"><span lang="en">Report a problem</span><span lang="zh-CN">反馈问题</span></a>
+      <a href="https://github.com/shiroixw/Closer">GitHub</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // 演示面板里的两项读数按 Closer 的同一算法现场算：
+  // 「显示」= 这张图此刻在页面上的绘制尺寸（meta.js：Math.round(rect)），
+  // 「在 … 上暂停」= 当前站点（与扩展一致，去掉 www.）。
+  (() => {
+    const img = document.getElementById('hero');
+    const shown = document.getElementById('shown');
+    const measure = () => {
+      const r = img.getBoundingClientRect();
+      if (r.width) shown.textContent = `${Math.round(r.width)} × ${Math.round(r.height)}`;
+    };
+    new ResizeObserver(measure).observe(img);
+
+    const host = location.hostname.replace(/^www\./, '');
+    if (host) for (const el of document.querySelectorAll('.site')) el.textContent = host;
+
+    const btn = document.getElementById('info');
+    const panel = document.getElementById('panel');
+    btn.addEventListener('click', () => {
+      panel.hidden = !panel.hidden;
+      btn.setAttribute('aria-expanded', String(!panel.hidden));
+    });
+
+    // ── 右边三颗：和扩展做同样的事，反馈也一样（对勾 1.2 s + 底部提示 1.4 s，见 overlay.js 的 flash / say）──
+    let L = ATTRS_OF(window.CLOSER_LANG);
+    const demo = document.getElementById('demo');
+    const copyBtn = document.getElementById('copy');
+    const saveBtn = document.getElementById('save');
+    const closeBtn = document.getElementById('close');
+    const toast = document.getElementById('toast');
+    const CHECK = '<svg viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 7"/></svg>';
+
+    const flash = (el) => {
+      if (el.classList.contains('done')) return;
+      const html = el.innerHTML;
+      el.classList.add('done');
+      el.innerHTML = CHECK;
+      setTimeout(() => { el.classList.remove('done'); el.innerHTML = html; }, 1200);
+    };
+    let toastTimer = 0;
+    const say = (text) => {
+      toast.textContent = text;
+      toast.classList.add('on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('on'), 1400);
+    };
+
+    // 复制：与扩展同一条路——画进 canvas 转 PNG（剪贴板只认 PNG），⇧ 点击复制地址。
+    // 把 Promise 直接交给 ClipboardItem，而不是 await 完再写：Safari 要求写入发生在点击的那一拍里。
+    copyBtn.addEventListener('click', async (e) => {
+      try {
+        if (e.shiftKey) {
+          await navigator.clipboard.writeText(img.src);
+          say(L.addrCopied);
+        } else {
+          const png = new Promise((resolve, reject) => {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/png');
+          });
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+          say(L.copied);
+        }
+        flash(copyBtn);
+      } catch {
+        say(L.copyFailed);
+      }
+    });
+
+    // 保存：就是一个 <a download>（扩展也是这么存的，D12），这里只补反馈。
+    saveBtn.addEventListener('click', () => {
+      flash(saveBtn);
+      say(L.saved);
+    });
+
+    // 关闭：图缩回页面里的大小，工具条退场；点图重新打开。
+    // 打开状态下点图不做任何事——留给装了 Closer 的人对比。关闭状态下点图会改 #demo 的 class，
+    // 扩展的让位检测（D30）看到页面接住了这次点击，会自己退场，不会叠两层。
+    const setClosed = (closed) => {
+      demo.classList.toggle('closed', closed);
+      if (closed) {
+        img.tabIndex = 0;
+        img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', L.reopen);
+        img.focus({ preventScroll: true });
+      } else {
+        img.removeAttribute('tabindex');
+        img.removeAttribute('role');
+        img.removeAttribute('aria-label');
+        closeBtn.focus({ preventScroll: true });
+      }
+    };
+    closeBtn.addEventListener('click', () => setClosed(true));
+    img.addEventListener('click', () => {
+      if (demo.classList.contains('closed')) setClosed(false);
+    });
+    img.addEventListener('keydown', (e) => {
+      if (demo.classList.contains('closed') && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        setClosed(false);
+      }
+    });
+
+    const top = document.getElementById('top');
+    const edge = () => top.classList.toggle('scrolled', scrollY > 8);
+    addEventListener('scroll', edge, { passive: true });
+    edge();
+
+    // ── 语言切换 ──
+    // 正文靠 CSS 显隐，这里只补 CSS 管不到的：<title>、属性文案与提示语。
+    // 演示按钮的文案与扩展的 _locales 用词一致（copyImage / saveImage / close / copied …）。
+    function ATTRS_OF(lang) {
+      return {
+        en: {
+          title: 'Closer — Click any image to view it full size',
+          hero: 'A mountain road under low clouds',
+          info: 'Image info',
+          copy: 'Copy image (⇧ click: copy address)',
+          save: 'Save image',
+          close: 'Close',
+          reopen: 'Open the photo again',
+          copied: 'Copied',
+          addrCopied: 'Address copied',
+          copyFailed: 'Copy failed',
+          saved: 'Download started',
+          lang: 'Switch to Chinese',
+        },
+        'zh-CN': {
+          title: 'Closer — 点任意图片，按原尺寸查看',
+          hero: '低云下的一条山路',
+          info: '图片信息',
+          copy: '复制图片（⇧ 点击：复制地址）',
+          save: '保存图片',
+          close: '关闭',
+          reopen: '重新打开这张照片',
+          copied: '已复制',
+          addrCopied: '已复制地址',
+          copyFailed: '复制失败',
+          saved: '已开始下载',
+          lang: '切换到英文',
+        },
+      }[lang];
+    }
+    const sw = document.getElementById('lang');
+    const apply = (lang) => {
+      const t = (L = ATTRS_OF(lang));
+      document.documentElement.lang = lang;
+      document.title = t.title;
+      img.alt = t.hero;
+      btn.title = t.info;
+      copyBtn.title = t.copy;
+      saveBtn.title = t.save;
+      closeBtn.title = t.close;
+      if (img.hasAttribute('role')) img.setAttribute('aria-label', t.reopen);
+      sw.setAttribute('aria-label', t.lang);
+    };
+    apply(window.CLOSER_LANG);
+    sw.hidden = false;
+    sw.addEventListener('click', () => {
+      const next = document.documentElement.lang === 'zh-CN' ? 'en' : 'zh-CN';
+      apply(next);
+      try { localStorage.setItem('closer-site-lang', next); } catch {}
+      // 链接里带着 ?lang= 时跟着改，否则刷新会被它改回去；没带就不往地址栏里加东西
+      const url = new URL(location.href);
+      if (url.searchParams.has('lang')) {
+        url.searchParams.set('lang', next === 'zh-CN' ? 'zh' : 'en');
+        history.replaceState(null, '', url);
+      }
+    });
+  })();
+</script>
+</body>
+</html>
