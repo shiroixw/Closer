@@ -2,50 +2,65 @@
 
 > Click any image to view it full size. Closer knows which images are worth opening.
 
-点任意一张图，按原尺寸看清它。一个知道哪些图值得打开的 Chrome 扩展。
+**English** · [简体中文](README.zh_CN.md)
 
-状态：**v0.1 功能齐了**。判断器、让位检测、字节通道、视图层、复制与保存全部落地，静态验收与冒烟测试通过。剩下的是真机站点回归与性能实测。
+Click any image and it opens at full size, from where it already sits. A Chrome extension that knows which images are worth opening.
 
-## 已经能跑的东西
+Status: **v0.1 is feature complete.** The judge, yield detection, the byte channel, the viewer layer, copy and save are all in place; static checks and smoke tests pass. What remains is regression on real sites and performance measurement.
 
-| 命令 | 它验证什么 |
+## Install
+
+No build step — the extension *is* the repository.
+
+1. Open `chrome://extensions` and switch on **Developer mode**.
+2. **Load unpacked** → select the repo root.
+3. A welcome page opens and asks for site access. Nothing is granted at install time: the manifest requests only `storage`, `scripting` and `activeTab`, and `*://*/*` is an *optional* host permission. Until you grant it on that page no content script is registered, and clicking an image does nothing.
+4. A tab that was already open when you granted access starts working as it is; refresh it only if you want a control case.
+
+Editing source takes effect after the refresh button on the extensions page.
+
+## What runs today
+
+| Command | What it proves |
 | --- | --- |
-| `npm run verify` | 一条命令跑完六件事：manifest 引用完整性、权限白名单与体积预算、每个发布文件的语法、语言包完整性（中英 42 条文案双向比对）、判断器 38 条规则、尺寸与文件名 31 条断言 |
-| `npm run smoke` | 真浏览器四件：E4 overlay 打开与关闭后 DOM 逐字节还原、E6 让位检测、E10 叠层查看器、E7 速度预算 |
-| `npm run live` | 装真扩展跑真实网页：E5 全链路 25 项、E8 三种背板 13 项、E9 偏好联动与窄视口居中 7 项 |
-| `node tools/lab/e2-drift.mjs` | 图片动的时候，命中点判据会不会脱靶（480 次比对，0 漂移） |
-| `node tools/lab/e3-pollution.mjs` | 跨域图经 blob 中转后 canvas 还污不污染（不污染，复制可做） |
+| `npm run verify` | Six checks in one command: manifest references, the permission allowlist and size budget, the syntax of every shipped file, both locale catalogs (42 strings each, compared in both directions), the judge's 38 rules, 31 assertions on dimensions and file names. |
+| `npm run smoke` | Four real-browser suites, 73 assertions: the overlay opens and the DOM is restored byte for byte on close, yield detection, the stacked viewer, the speed budget. |
+| `npm run live` | The real extension against real pages: end-to-end on live sites (needs network), three backdrops plus panel theming (25 assertions), preference wiring and narrow-viewport centering (9 assertions). |
+| `node tools/lab/e2-drift.mjs` | Whether the hit-point criterion drifts while the image is moving — 480 comparisons, 0 drift. |
+| `node tools/lab/e3-pollution.mjs` | Whether a cross-origin image routed through a blob still taints the canvas — it does not, so copying works. |
 
-`verify` 无需浏览器。其余脚本各自拉起一个**本进程独占的 headless Chrome**（系统分配端口、临时 profile、桩服务器用空闲端口，见 `tools/lab/browser.mjs`）：没有窗口，不抢输入焦点与桌面焦点，也**允许几个测试同时跑**——几份代码在不同工作树里并行改、并行测时，各自的扩展、端口、暂存目录互不干扰。进程退出即回收；被 `kill -9` 留下的孤儿由下一次启动顺手清掉，也可手动 `node tools/lab/browser.mjs sweep`。
+`verify` needs no browser, and prints the content-side budget while it runs: **70.5 KB of 72 KB**, 38 top-level declarations out of 9 injected files. The other scripts each launch a **headless Chrome owned by that process** (system-assigned port, throwaway profile, stub servers on free ports — see `tools/lab/browser.mjs`): no window, so it never steals input or desktop focus, and **several can run at once** — different worktrees running different code keep their own extension, ports and scratch directories without touching each other. Everything is reclaimed when the process exits; orphans left behind by `kill -9` are swept by the next start, or by hand with `node tools/lab/browser.mjs sweep`.
 
-要看着跑时显式指定有界面的实例：`CDP=http://127.0.0.1:9333 npm run smoke`（这时会退回共享浏览器，测试之间还会互相清理扩展，别并行跑）。E5 走真实站点，需要网络。
+To watch a run, point at a windowed instance explicitly: `CDP=http://127.0.0.1:9333 npm run smoke`. That falls back to a shared browser, where the suites clean up each other's extensions, so don't run them in parallel. `e5` drives real sites and needs network.
 
 ---
 
-## 为什么这不只是又一个看图插件
+## Why this is not just another image viewer
 
-Chrome 自带一个看图器。十几个扩展各有一个，其中已经有一个把尺寸、EXIF、旋转做得很好。做第十五个，不成其为产品。
+Chrome ships an image viewer. A dozen extensions ship one, and one of them already does dimensions, EXIF and rotation well. The fifteenth is not a product.
 
-真正缺的是**判断力**：在一个 Closer 从没见过的页面上、面对四十张图，知道用户点下去的是哪一张。overlay 是容易的那一半，也是唯一能被抄走的那一半。判断器才是值得做的那一半——所以整个项目的其余部分，都是为保护它而写的。
+What is missing is **judgement**: on a page Closer has never seen, in front of forty images, knowing which one the user just clicked. The overlay is the easy half — and the only half anyone can copy. The judge is the half worth building, which is why everything else in this repo is written to protect it.
 
-## 按这个顺序读
+## Read in this order
 
-| 文件 | 它决定了什么 |
+| File | What it settles |
 | --- | --- |
-| [`CONSTITUTION.md`](CONSTITUTION.md) | 十条用来结束争论的条文：不打扰、页面主权、速度是预算、优雅是减法。每一条都带一个可以失败的检验。 |
-| [`docs/design-v0.1.md`](docs/design-v0.1.md) | 真正的 v0.1：权限模型、点击契约、让位检测、有序信号表、overlay 与信息面板规格、架构，以及十二条手工验收标准。 |
-| [`docs/tech-spec.md`](docs/tech-spec.md) | 实现级方案：模块契约、状态机、坐标数学、让位检测落地、字节通道、视图层（事件所有权、渲染、焦点）、复制与保存链路、MV3 的坑。最后三个实验必须在写代码前跑完。 |
-| [`docs/decisions.md`](docs/decisions.md) | 哪些已经锁定及原因、曾经的分歧是怎么收敛的，以及已被否决的方案——写下来，是为了让它们别再回来。 |
-| [`docs/cases.md`](docs/cases.md) | 每一次真实的误判/漏判，**包括修不了的**。`test-judge` 是规则的影子，只有这张表来自真实世界。 |
-| [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十六件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
+| [`CONSTITUTION.md`](CONSTITUTION.md) | Ten articles written to end arguments: don't interrupt, the page owns the page, speed is a budget, elegance is subtraction. Each carries a test that can fail. |
+| [`docs/design-v0.1.md`](docs/design-v0.1.md) | The actual v0.1: permission model, click contract, yield detection, the ordered signal table, overlay and info panel spec, architecture, and the manual acceptance criteria. |
+| [`docs/tech-spec.md`](docs/tech-spec.md) | Implementation level: module contracts, state machine, coordinate math, yield detection in practice, the byte channel, the viewer layer (event ownership, rendering, focus), the copy and save paths, MV3 pitfalls. |
+| [`docs/decisions.md`](docs/decisions.md) | What is locked and why, how the disagreements converged, and what has already been rejected — written down so it does not come back. |
+| [`docs/cases.md`](docs/cases.md) | Every real misjudgement, **including the ones we cannot fix**. `test-judge` is the shadow of the rules; only this table comes from the world. |
+| [`docs/manual-check.md`](docs/manual-check.md) | The eighteen things automation cannot test: permission prompts, the clipboard, yield on real sites. Install once, five minutes. |
+| [`docs/STATUS.md`](docs/STATUS.md) | Where the work actually stands — the single source of truth for progress. |
 
-## 一段话总结
+The design documents are written in Chinese, the project's working language. Code, UI strings and commit subjects are English.
 
-全站默认开启，按站点关闭。点一张图，它从自己的缩略图里飞出来、就地展开，滚轮缩放、拖拽平移。左上角一个 ⓘ（`·` 键同义），点开才知道这张图到底是什么——原始像素尺寸与页面实际绘制的尺寸之差、宽高比、百万像素、格式、文件大小；右上角三个动作：复制、保存、关闭，复制与保存另有 `⌘/Ctrl + C`、`⌘/Ctrl + S`，做完在底部说一声。不带查看器的站点，我们打开；自带查看器的站点，我们退场。除读取你正在看的那张图之外不发起任何网络请求，不申请 `downloads`，也不申请任何 host 权限——直到你按下那个按钮。无埋点、无构建步骤、无第三方框架。界面有中英两种，用哪一种由浏览器语言决定，没有开关可拨错。
+## In one paragraph
 
-## 许可
+On by default everywhere, off per site. Click an image and it flies out of its own thumbnail, unfolding in place; wheel to zoom, drag to pan. A ⓘ in the top-left corner (the `·` key does the same) reveals what the image actually is — native pixels against the pixels the page drew, aspect ratio, megapixels, format, file size. Three actions top-right: copy, save, close, with `⌘/Ctrl + C` and `⌘/Ctrl + S` as equivalents, and a line at the bottom to confirm. Sites without a viewer, we appear; sites with their own, we step aside. No network request beyond reading the image you are already looking at, no `downloads` permission, no host permission — until you press that button. No telemetry, no build step, no third-party framework. The interface is English and Chinese, chosen by browser language, with no toggle to get wrong.
 
-MIT。可商用、可改动、可分支，保留版权声明即可。
+## License
 
-许可不授权商标，所以「Closer」这个名字仍归作者——真有人拿这份代码做恶意版本，能拦住的不是许可证，是商店清单和这个名字。
+MIT. Use it commercially, change it, fork it — keep the copyright notice.
 
+The license grants no trademark, so the name "Closer" stays with the author: if someone did ship a malicious build of this code, what stops them is the store listing and the name, not the license.
