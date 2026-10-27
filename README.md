@@ -40,7 +40,7 @@ Chrome 自带一个看图器。十几个扩展各有一个，其中已经有一�
 | [`docs/decisions.md`](docs/decisions.md) | 哪些已经锁定及原因、曾经的分歧是怎么收敛的，以及已被否决的方案——写下来，是为了让它们别再回来。 |
 | [`docs/cases.md`](docs/cases.md) | 每一次真实的误判/漏判，**包括修不了的**。`test-judge` 是规则的影子，只有这张表来自真实世界。 |
 | [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十八件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
-| [`docs/privacy.html`](docs/privacy.html) | 商店要的那一页：它到底怎么对待数据。每一句都能在它旁边的源码里对上。 |
+| [https://closer-viewer.vercel.app/privacy](https://closer-viewer.vercel.app/privacy) | 商店要的那一页：它到底怎么对待数据。源文件在官网分支的 `docs/` 下，每一句都能在源码里对上。 |
 
 ## 一段话总结
 

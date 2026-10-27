@@ -77,7 +77,7 @@
 
 ## 验完之后
 
-- 全过 → 跑一次 `npm run pack`（产物在 `.temp/closer-<version>.zip`），拿它去商店；隐私政策在 `docs/privacy.html`，托管后把 URL 填进后台
+- 全过 → 跑一次 `npm run pack`（产物在 `.temp/closer-<version>.zip`），拿它去商店；隐私政策就是官网的 `/privacy` 页（源文件随官网分支交付，对外地址 `https://closer-viewer.vercel.app/privacy`），确认它在线后把 URL 填进后台
 - 有不过的 → 把第几条、什么现象、哪个站点记下来，按 `docs/STATUS.md` 的 bug 表格式补一行，再修
 
 **已知会让人犹豫但按设计如此的两件事**（不算 bug）：

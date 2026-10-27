@@ -73,7 +73,7 @@
 | 文案与语言 | `_locales/{en,zh_CN}/messages.json` + `ui/i18n.js` + `Closer.t` | ✅ 页面已真机验 / ⚠️ overlay 未验 | `check-i18n` 2 种语言 × 42 个 key 双向比对；zh-CN 的 Chrome 里实测 manifest 名、popup、welcome（含 `3 个站点` / `1 个站点` / `恢复`、`<strong>` 未被转义）；overlay 的中文文案需要 host 授权才能注入，留给 manual-check 17 |
 | 图标 16/32/48/128 | `icons/` + `tools/icons.py` | ✅ | 241 B – 1.7 KB，`python3 tools/icons.py` 可重生 |
 | 发布物 `pack` | `tools/pack.mjs` | ✅ | 清单 24 个文件 / 50.2 KB；`--check` 在 `verify` 里；zip 写完回读解压逐字节比对（D37） |
-| 隐私政策 | `docs/privacy.html` | ✅ 文案就绪 / URL 待官网 | 中英同页，claim 与源码逐条对应（D38）；对外地址由官网分支提供，回填位置见 `store/listing.md` 的占位 |
+| 隐私政策 | `https://closer-viewer.vercel.app/privacy` | ✅ 已上线（源文件随官网分支交付） | 中英同页，claim 与源码逐条对应（D38）；对外地址由官网分支提供，回填位置见 `store/listing.md` 的占位 |
 | 商店物料 | `tools/promo.mjs` → `store/` | ✅ 待上传 | 14 张图（5 截图 × 2 语言 + 440×280 / 1400×560 × 2 语言），尺寸逐张校验；物料里的每个数字都来自真实代码路径 |
 | 实验 E1–E11 | `tools/lab/` | ✅ E2–E11 存在，E1 析出为 `tools/probe-yield.js` | 均需 CDP，未接入 CI；E8 已改为自包含桩页面，不再依赖外网；E10、**E11 已进 `npm run smoke`**——E11 用「要发布的那 24 个文件」装一次扩展，问 Chrome 四件事：装得上 / 两个页面渲染出文案 / 未授权不注册脚本 / 无 error 日志 |
 
@@ -102,7 +102,7 @@
 | T19 | 可发现性：判得开的图悬停给原生 `zoom-in`（D32） | 只在该放大的图上出现；页面自己的手势优先；离开即还原且不留 `style` 属性；`snapshot()` 之前撤销 | ✅ 代码完成（e4 +4 条、e7 监听 2 → 3）；`smoke` 与真机手感待验（manual-check 18） |
 | T20 | 第 12 条认「pointer 语义」光标（cases 011 / D34） | `pointer` 与 `url(…), pointer` 同判；兜底 `auto`、单值 `url(…)`、URL 里带 pointer 但兜底 auto 都不判；普通正文图不受影响 | ✅ `test-judge` 7 条（31 → 38）、`e6` K1–K3（16 → 19）；真机 KM 页与阮一峰周刊 416 注入对照 |
 | T21 | 发布物打包（D37） | `npm run pack` 产出一个能直接上传的 zip；清单不许有遗漏、也不许把 `docs/` `tools/` 带进去；`verify` 含清单闭合检查；产出的那一段能装进 Chrome | ✅ 2026-10-26：24 个文件 / 50.2 KB，`unzip -t` 无报错，同源码两次构建 md5 一致；注入一个悬空文件 → `--check` 退出码 1；`e11` 用这份清单装扩展 **5/5** |
-| T22 | 隐私政策页（D38 / B3） | 中英同页；政策里每一句都能在源码里找到对应实现 | ✅ `docs/privacy.html`；对外地址 `closer-viewer.vercel.app/privacy`（D40），剩下的是填进商店后台 |
+| T22 | 隐私政策页（D38 / B3） | 中英同页；政策里每一句都能在源码里找到对应实现 | ✅ 对外地址 `https://closer-viewer.vercel.app/privacy`（D40），源文件随官网分支交付，剩下的是填进商店后台 |
 | T23 | 商店物料（截图 / 详细描述 / 权限理由 / 隐私实践表单） | 提交按钮能按下去 | ✅ 2026-10-26：图片 14 张由 `tools/promo.mjs` 生成（两语言 × 5 截图 + 2 宣传图，尺寸精确），文案在 `store/listing.md`；剩下的是人工上传到后台 |
 
 ## 中断规则（这条最重要）
@@ -128,7 +128,7 @@
 |---|---|---|---|
 | B1 | ~~v0.1 代码未提交~~ | 已在 commit 中存档 | ✅ 已解决 |
 | B2 | E2–E8 需要 CDP 端口，未纳入 `verify` | 让位与视图质量靠手动跑 `smoke` / `live` | 作者决定是否接 CI |
-| B3 | ~~隐私政策页（申请 all-urls 前必须有）~~ | 文案已落地 `docs/privacy.html`（D38）；对外 URL 改由**官网**托管（2026-10-27 作者决定）：`https://closer-viewer.vercel.app/privacy`（D40），官网合并上线后填进 `store/listing.md` 与商店后台 | 🟡 页内已就绪，URL 已定、待官网上线 |
+| B3 | ~~隐私政策页（申请 all-urls 前必须有）~~ | 文案已随官网落地（D38）；对外地址 `https://closer-viewer.vercel.app/privacy`（D40，2026-10-27 作者决定改由**官网**托管），填进 `store/listing.md` 与商店后台 | ⏳ 地址已定，等官网合并上线 |
 | B7 | ~~商店物料全空~~ | 图片与文案已就绪（`store/`），剩下的是上传到后台、开 Pages 填隐私政策 URL | ✅ 已解决（2026-10-26） |
 | B8 | 开发者账号（$5 注册费、邮箱验证、2FA）未确认可用 | 没有账号，前面全部工作没有出口 | 作者 |
 | B4 | ~~content 侧余量不足~~ | 预算 40 → 60 KB 后余量 13.8 KB（46.2 KB / 60 KB） | ✅ 已解决（D21） |
