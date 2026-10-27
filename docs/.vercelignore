@@ -1,0 +1,8 @@
+# 官网只发布这几样（D40）。docs/ 下其余都是开发台账（decisions.md、cases.md、STATUS.md……），
+# 在公开仓库里本来就能读，但不该成为 closer-viewer.vercel.app 上的页面。
+# 白名单写法：先全部忽略，再逐个放行——以后在 docs/ 加台账不会意外上线，加页面要来这里登记。
+/*
+!/index.html
+!/privacy.html
+!/assets
+!/vercel.json

@@ -4,7 +4,7 @@
 
 点任意一张图，按原尺寸看清它。一个知道哪些图值得打开的 Chrome 扩展。
 
-官网：<https://shiroixw.github.io/Closer/>（源文件 `docs/index.html`，GitHub Pages 从 `main` / `/docs` 发布，见 D40）
+官网：<https://closer-viewer.vercel.app/>（源文件 `docs/index.html`，Vercel 从 `main` 的 `docs/` 发布，见 D40）
 
 状态：**v0.1 功能齐了**。判断器、让位检测、字节通道、视图层、复制与保存全部落地，静态验收与冒烟测试通过。剩下的是真机站点回归与性能实测。
 
