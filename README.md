@@ -6,17 +6,19 @@
 
 官网：<https://closer-viewer.vercel.app/>（源文件 `docs/index.html`，Vercel 从 `main` 的 `docs/` 发布，见 D40）
 
-状态：**v0.1 功能齐了**。判断器、让位检测、字节通道、视图层、复制与保存全部落地，静态验收与冒烟测试通过。剩下的是真机站点回归与性能实测。
+状态：**v0.1 功能齐了，机器能验的部分全绿**。判断器、让位检测、字节通道、视图层、复制与保存全部落地；`smoke` 78 项全过，`live` 已复跑 34 项（真实站点那一组还要外网），授权链路已真机走通。商店物料（截图、宣传图、上架文案）已由 `npm run promo` 与 `store/listing.md` 备好。剩下的是手工验收的 15 条，以及把它们传进商店后台。
 
 ## 已经能跑的东西
 
 | 命令 | 它验证什么 |
 | --- | --- |
 | `npm run verify` | 一条命令跑完六件事：manifest 引用完整性、权限白名单与体积预算、每个发布文件的语法、语言包完整性（中英 42 条文案双向比对）、判断器 38 条规则、尺寸与文件名 31 条断言 |
-| `npm run smoke` | 真浏览器四件：E4 overlay 打开与关闭后 DOM 逐字节还原、E6 让位检测、E10 叠层查看器、E7 速度预算 |
+| `npm run smoke` | 真浏览器五件：E4 overlay 打开与关闭后 DOM 逐字节还原、E6 让位检测、E10 叠层查看器、E7 速度预算，以及 E11——拿**要发布的那 24 个文件**（不是仓库根）装一次扩展，确认它真的跑得起来 |
 | `npm run live` | 装真扩展跑真实网页：E5 全链路 25 项、E8 三种背板 13 项、E9 偏好联动与窄视口居中 7 项 |
 | `node tools/lab/e2-drift.mjs` | 图片动的时候，命中点判据会不会脱靶（480 次比对，0 漂移） |
 | `node tools/lab/e3-pollution.mjs` | 跨域图经 blob 中转后 canvas 还污不污染（不污染，复制可做） |
+| `npm run pack` | 把要发布的那一段挑出来压成 `.temp/closer-<version>.zip`：清单从引用关系推，不手写；写完立刻读回来解压比对，同一份源码永远得到同一个 sha256 |
+| `npm run promo` | 生成商店物料：两语言各 5 张 1280×800 截图 + 440×280 / 1400×560 宣传图，产物在 `store/`（不进 git，脚本进） |
 
 `verify` 无需浏览器。其余脚本各自拉起一个**本进程独占的 headless Chrome**（系统分配端口、临时 profile、桩服务器用空闲端口，见 `tools/lab/browser.mjs`）：没有窗口，不抢输入焦点与桌面焦点，也**允许几个测试同时跑**——几份代码在不同工作树里并行改、并行测时，各自的扩展、端口、暂存目录互不干扰。进程退出即回收；被 `kill -9` 留下的孤儿由下一次启动顺手清掉，也可手动 `node tools/lab/browser.mjs sweep`。
 
@@ -39,7 +41,8 @@ Chrome 自带一个看图器。十几个扩展各有一个，其中已经有一�
 | [`docs/tech-spec.md`](docs/tech-spec.md) | 实现级方案：模块契约、状态机、坐标数学、让位检测落地、字节通道、视图层（事件所有权、渲染、焦点）、复制与保存链路、MV3 的坑。最后三个实验必须在写代码前跑完。 |
 | [`docs/decisions.md`](docs/decisions.md) | 哪些已经锁定及原因、曾经的分歧是怎么收敛的，以及已被否决的方案——写下来，是为了让它们别再回来。 |
 | [`docs/cases.md`](docs/cases.md) | 每一次真实的误判/漏判，**包括修不了的**。`test-judge` 是规则的影子，只有这张表来自真实世界。 |
-| [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十六件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
+| [`docs/manual-check.md`](docs/manual-check.md) | 自动化测不了的十八件事：权限弹窗、剪贴板、真实站点上的让位。装一次，五分钟。 |
+| [https://closer-viewer.vercel.app/privacy](https://closer-viewer.vercel.app/privacy) | 商店要的那一页：它到底怎么对待数据。源文件在官网分支的 `docs/` 下，每一句都能在源码里对上。 |
 
 ## 一段话总结
 

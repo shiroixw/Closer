@@ -73,7 +73,7 @@ const cases = [
   ['普通正文图', img({ cursor: 'auto' }), true],
   // km 调查页：正文图挂 `cursor: url(cursor_zoom.cur), pointer`，点击是 window.open 开新标签页，
   // 页面上再没有别的痕迹（无 <a>、无 role、无 onclick）。兜底写 pointer，语义仍是「点我」（D34）。
-  ['自定义光标 + pointer 兜底（km）', img({ cursor: 'url("https://km.woa.com/img/cursor_zoom.cur"), pointer' }), false],
+  ['自定义光标 + pointer 兜底（km）', img({ cursor: 'url("https://km.example.com/img/cursor_zoom.cur"), pointer' }), false],
   ['自定义光标带热点坐标，兜底 pointer', img({ cursor: 'url("hand.cur") 4 4, pointer' }), false],
   ['自定义光标在容器上，图靠继承', img({ cursor: 'url("zoom.cur"), pointer', parents: [{ cursor: 'url("zoom.cur"), pointer' }] }), false],
   ['自定义光标多段兜底（url, url, pointer）', img({ cursor: 'url("a.cur"), url("b.cur"), pointer' }), false],

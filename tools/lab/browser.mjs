@@ -158,6 +158,12 @@ async function launch() {
       '--no-default-browser-check',
       '--disable-features=Translate,OptimizationHints',
       '--window-size=1280,900',
+      // 界面语言：chrome.i18n 跟的是 Chrome 的 UI 语言，不是 navigator.language。
+      // 测 D29 的两套文案、生成商店物料的两套截图都要它（默认跟随系统，macOS 上中文）。
+      ...(process.env.CLOSER_LANG ? [`--lang=${process.env.CLOSER_LANG}`] : []),
+      // 让本地桩站点挂一个像真域名的名字（例：MAP grano.studio 127.0.0.1）。
+      // 商店截图里 popup / 面板会显示站点名，`127.0.0.1:8123` 出现在截图上是噪音。
+      ...(process.env.CLOSER_HOST_RULES ? [`--host-resolver-rules=${process.env.CLOSER_HOST_RULES}`] : []),
       `--user-agent=${userAgent()}`,
       'about:blank',
     ],
