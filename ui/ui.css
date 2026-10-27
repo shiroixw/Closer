@@ -49,6 +49,18 @@ body.wide {
 h1 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; color: var(--dim); }
 
+/* popup 的标题与状态同一行（welcome 没有状态，仍是独立 h1）。
+   baseline 对齐而不是 center：两边字号不同（15 / 13），按中线对齐会让小字看起来偏高。 */
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px; /* 与下面第一条分隔线的间距 */
+}
+.head h1 { margin: 0; }
+.head p { min-width: 0; white-space: nowrap; }
+
 .row {
   display: flex;
   align-items: center;
@@ -57,8 +69,6 @@ p { margin: 0; color: var(--dim); }
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
-
-.row:first-of-type { margin-top: 10px; }
 
 .host { font-variant-numeric: tabular-nums; }
 
