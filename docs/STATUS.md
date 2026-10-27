@@ -73,7 +73,7 @@
 | 文案与语言 | `_locales/{en,zh_CN}/messages.json` + `ui/i18n.js` + `Closer.t` | ✅ 页面已真机验 / ⚠️ overlay 未验 | `check-i18n` 2 种语言 × 42 个 key 双向比对；zh-CN 的 Chrome 里实测 manifest 名、popup、welcome（含 `3 个站点` / `1 个站点` / `恢复`、`<strong>` 未被转义）；overlay 的中文文案需要 host 授权才能注入，留给 manual-check 17 |
 | 图标 16/32/48/128 | `icons/` + `tools/icons.py` | ✅ | 241 B – 1.7 KB，`python3 tools/icons.py` 可重生 |
 | 发布物 `pack` | `tools/pack.mjs` | ✅ | 清单 24 个文件 / 50.2 KB；`--check` 在 `verify` 里；zip 写完回读解压逐字节比对（D37） |
-| 隐私政策 | `docs/privacy.html` | ✅ 待托管 | 中英同页，claim 与源码逐条对应（D38）；URL 待 Pages 开启后填进商店 |
+| 隐私政策 | `docs/privacy.html` | ✅ 文案就绪 / URL 待官网 | 中英同页，claim 与源码逐条对应（D38）；对外地址由官网分支提供，回填位置见 `store/listing.md` 的占位 |
 | 商店物料 | `tools/promo.mjs` → `store/` | ✅ 待上传 | 14 张图（5 截图 × 2 语言 + 440×280 / 1400×560 × 2 语言），尺寸逐张校验；物料里的每个数字都来自真实代码路径 |
 | 实验 E1–E11 | `tools/lab/` | ✅ E2–E11 存在，E1 析出为 `tools/probe-yield.js` | 均需 CDP，未接入 CI；E8 已改为自包含桩页面，不再依赖外网；E10、**E11 已进 `npm run smoke`**——E11 用「要发布的那 24 个文件」装一次扩展，问 Chrome 四件事：装得上 / 两个页面渲染出文案 / 未授权不注册脚本 / 无 error 日志 |
 
@@ -128,7 +128,7 @@
 |---|---|---|---|
 | B1 | ~~v0.1 代码未提交~~ | 已在 commit 中存档 | ✅ 已解决 |
 | B2 | E2–E8 需要 CDP 端口，未纳入 `verify` | 让位与视图质量靠手动跑 `smoke` / `live` | 作者决定是否接 CI |
-| B3 | ~~隐私政策页（申请 all-urls 前必须有）~~ | 页面已落地 `docs/privacy.html`（D38）；只剩「开 Pages、把 URL 填进商店」两个动作 | ✅ 已解决（2026-10-26） |
+| B3 | ~~隐私政策页（申请 all-urls 前必须有）~~ | 文案已落地 `docs/privacy.html`（D38）；对外 URL 改由**官网分支**托管（2026-10-27 作者决定），合并后回填 `store/listing.md` 与商店后台 | 🟡 页内已就绪，URL 待官网 |
 | B7 | ~~商店物料全空~~ | 图片与文案已就绪（`store/`），剩下的是上传到后台、开 Pages 填隐私政策 URL | ✅ 已解决（2026-10-26） |
 | B8 | 开发者账号（$5 注册费、邮箱验证、2FA）未确认可用 | 没有账号，前面全部工作没有出口 | 作者 |
 | B4 | ~~content 侧余量不足~~ | 预算 40 → 60 KB 后余量 13.8 KB（46.2 KB / 60 KB） | ✅ 已解决（D21） |
