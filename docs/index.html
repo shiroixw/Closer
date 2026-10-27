@@ -341,14 +341,15 @@
     <div class="viewer">
       <img class="photo" id="hero" src="assets/hero.jpg" width="1600" height="1000" alt="A mountain road under low clouds" fetchpriority="high" decoding="async">
       <div class="bar">
-        <button class="chip" id="info" type="button" aria-expanded="true" aria-controls="panel" title="Image info">i</button>
+        <button class="chip" id="info" type="button" aria-expanded="false" aria-controls="panel" title="Image info">i</button>
         <div class="actions">
           <button class="chip" id="copy" type="button" title="Copy image (⇧ click: copy address)"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6.5A2.5 2.5 0 0 0 4 5.5v6A2.5 2.5 0 0 0 6.5 14"/></svg></button>
           <a class="chip" id="save" href="assets/hero.jpg" download="hero.jpg" title="Save image"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg></a>
           <button class="chip" id="close" type="button" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
       </div>
-      <div class="panel" id="panel">
+      <!-- 默认收起，和扩展一致（overlay.js 里 .panel 也是 hidden 起步）：面板是按需看的，不该先挡住图 -->
+      <div class="panel" id="panel" hidden>
         <div class="dims">1600 × 1000</div>
         <div class="sub"><span lang="en">shown</span><span lang="zh-CN">显示</span> <span id="shown">1280 × 800</span></div>
         <div class="sub">8:5 · 1.6 MP</div>
