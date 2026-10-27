@@ -124,6 +124,7 @@ const welcomeText = await evalIn(
   `({
      perm: document.querySelector('#perm')?.textContent?.trim() || '',
      intro: document.querySelector('[data-i18n="welcomeIntro"]')?.textContent?.trim() || '',
+     yield: document.querySelector('[data-i18n="welcomeYield"]')?.textContent?.trim() || '',
      appName: chrome.i18n.getMessage('appName') || '',
      css: getComputedStyle(document.body).maxWidth
    })`
@@ -133,11 +134,14 @@ check(
   'G2a welcome 渲染出文案（语言包 + i18n.js + css 都在）',
   welcomeText?.perm?.length > 0 &&
     welcomeText?.intro?.length > 0 &&
+    // 让位说明是纯文案：漏 key 时 getMessage 只返回 key 名，页面上不会报错，只会露出一行 welcomeYield
+    welcomeText?.yield?.length > 0 &&
+    welcomeText?.yield !== 'welcomeYield' &&
     welcomeText?.appName?.length > 0 &&
     welcomeText?.perm !== 'allowAll' &&
     welcomeText?.css !== 'none',
   welcomeText
-    ? `按钮「${welcomeText.perm}」· 名称「${welcomeText.appName}」· body max-width ${welcomeText.css}`
+    ? `按钮「${welcomeText.perm}」· 让位说明 ${welcomeText.yield.length} 字 · 名称「${welcomeText.appName}」· body max-width ${welcomeText.css}`
     : '页面没响应'
 );
 

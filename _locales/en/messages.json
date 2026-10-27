@@ -49,6 +49,9 @@
   "welcomeIntro": {
     "message": "Click any image to view it full size, in place, at its real dimensions."
   },
+  "welcomeYield": {
+    "message": "If a site brings its own image viewer, Closer steps aside: the click goes to the site, and no second viewer is stacked on top. That is not a failure — the image is already open, just not by us."
+  },
   "siteAccess": {
     "message": "Site access"
   },
@@ -65,7 +68,7 @@
     "message": "Paused sites"
   },
   "welcomeEmpty": {
-    "message": "Nothing paused. When a site has its own viewer or gets in the way, hit <strong>Pause on …</strong> inside the info panel."
+    "message": "Nothing paused. When a site gets in the way, hit <strong>Pause on …</strong> inside the info panel."
   },
   "pausedCountOne": {
     "message": "1 site"
