@@ -1,12 +1,14 @@
-// E7 — 宪法第六条的速度预算，实测。
+// E7 — 宪法第六条 A 表里「只能靠真浏览器测」的那两条。
 //
-// 三条断言，全部在 CPU 4× 降速下取（不带降速测出来的数字没有意义）：
+// 都在 CPU 4× 降速下取（不带降速测出来的数字没有意义）：
 //   1. judge() 单次 < 1 ms
 //   2. 点击到首帧 < 100 ms
-//   3. 页面加载期挂在 window 上的监听 ≤ 2 个
+// 另外两条是对照：悬停提示用真实鼠标验一次（e4 验的是判据逻辑，不是浏览器真的
+// 派了 pointerover），以及「这次点击确实打开了 overlay」——否则前两条数字漂亮地
+// 测了一堆没发生的事。
 //
-// 第 3 条用静态计数：把 content 脚本当文本数 addEventListener 的顶层调用。
-// 动态数需要 DevTools 的 getEventListeners，页面里没有。
+// A 表另两项（加载期监听数、代码量）静态可数，放在 `npm run verify` 里
+// （`tools/check-manifest.mjs`）：能自动验的不该只活在需要手跑的车道上。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -272,27 +274,7 @@ check(
 );
 check('点击确实打开了 overlay', (await ev("!!document.getElementById('closer')")) === true);
 
-/* --- 4. 加载期的监听器（静态） --- */
-
-// 加载期的监听分布在两个文件：boot 的接线，和 hint 的 pointerover（D32）。
-// 只数 boot.js 会漏掉后者——预算数字必须跟着代码走，否则条子在说谎。
-const bootSrc = fs.readFileSync(path.join(ROOT, 'src/content/boot.js'), 'utf8');
-const hintSrc = fs.readFileSync(path.join(ROOT, 'src/content/hint.js'), 'utf8');
-const addsOf = (src) => (src.match(/^\s*addEventListener\(/gm) || []).length;
-const bootAdds = addsOf(bootSrc);
-const hintAdds = addsOf(hintSrc);
-check(
-  '页面加载期只挂 ≤ 3 个监听',
-  bootAdds + hintAdds <= 3,
-  `boot.js × ${bootAdds} + hint.js × ${hintAdds}（宪法第六条，D32）`
-);
-
-// overlay 打开时才挂的那一批，不该算进加载预算
-const overlaySrc = fs.readFileSync(path.join(ROOT, 'src/content/overlay.js'), 'utf8');
-const overlayAdds = (overlaySrc.match(/addEventListener\(/g) || []).length;
-check('监听绑在打开之后', overlayAdds > 0, `overlay.js 共 ${overlayAdds} 处（bind/unbind 成对，加载期不执行）`);
-
-/* --- 5. 收尾 --- */
+/* --- 4. 收尾 --- */
 
 await send('Emulation.setCPUThrottlingRate', { rate: 1 });
 await send('Emulation.clearDeviceMetricsOverride');
