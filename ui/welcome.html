@@ -9,6 +9,11 @@
   <h1>Closer</h1>
   <p data-i18n="welcomeIntro"></p>
 
+  <!-- 期望管理，放在首屏、紧跟着「它做什么」：用户不会为了理解一次点击而回到这一页，
+       所以这是唯一一次能提前说明「让位不是失效」的机会。不提「暂停」——让位是设计，
+       暂停是逃生舱（D14），把两者并列会让用户以为有查看器的站点该被关掉。 -->
+  <p class="note" style="color:var(--dim)" data-i18n="welcomeYield"></p>
+
   <div class="row" style="margin-top:26px">
     <span data-i18n="siteAccess"></span>
     <button id="perm" class="primary" data-i18n="allowAll"></button>

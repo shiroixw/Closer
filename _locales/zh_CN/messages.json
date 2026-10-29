@@ -49,6 +49,9 @@
   "welcomeIntro": {
     "message": "点任意图片，就地按它真实的尺寸查看。"
   },
+  "welcomeYield": {
+    "message": "站点自带查看器时，Closer 会退场：这次点击交给页面，我们不叠第二层。那不是失效——图已经被打开了，只是开它的人不是我们。"
+  },
   "siteAccess": {
     "message": "网站访问权限"
   },
@@ -65,7 +68,7 @@
     "message": "已暂停的站点"
   },
   "welcomeEmpty": {
-    "message": "还没有暂停任何站点。某个站点自带查看器或者挡住你时，点信息面板里的<strong>「在 … 上暂停」</strong>。"
+    "message": "还没有暂停任何站点。某个站点碍事时，点信息面板里的<strong>「在 … 上暂停」</strong>。"
   },
   "pausedCountOne": {
     "message": "1 个站点"
