@@ -8,9 +8,9 @@
     "node": ">=22"
   },
   "scripts": {
-    "verify": "node tools/check-manifest.mjs && node tools/check-i18n.mjs && node tools/test-judge.mjs && node tools/test-meta.mjs && node tools/test-code-bytes.mjs && node tools/pack.mjs --check",
+    "verify": "node tools/check-manifest.mjs && node tools/check-i18n.mjs && node tools/test-judge.mjs && node tools/test-yield.mjs && node tools/test-meta.mjs && node tools/test-code-bytes.mjs && node tools/pack.mjs --check",
     "check": "node tools/check-manifest.mjs && node tools/check-i18n.mjs && node tools/pack.mjs --check",
-    "test": "node tools/test-judge.mjs && node tools/test-meta.mjs && node tools/test-code-bytes.mjs",
+    "test": "node tools/test-judge.mjs && node tools/test-yield.mjs && node tools/test-meta.mjs && node tools/test-code-bytes.mjs",
     "pack": "node tools/pack.mjs",
     "promo": "node tools/promo.mjs",
     "smoke": "node tools/lab/e4-overlay.mjs && node tools/lab/e6-yield-live.mjs && node tools/lab/e10-stacked-viewer.mjs && node tools/lab/e7-perf.mjs && node tools/lab/e11-package.mjs",

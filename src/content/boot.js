@@ -74,7 +74,8 @@ var Closer = (window.Closer ||= {});
     const img = Closer.pick(target, e.clientX, e.clientY);
     if (!img || !Closer.judge(img)) return;
 
-    // 页面已经在自己开的那一层里展示它了：再开一层只是两套遮罩（case 006）。
+    // 页面正以它自己的方式展示这张图（站点自带查看器开着，cases 006 / 014），或者我们
+    // 此刻根本没法展示（全屏、cases 013）：交给页面。读的是此刻的屏幕，不是记忆。
     // 这条路径一个字节都不改——不拦默认行为，站点自己的放大缩小照常。
     if (Closer.shelled(img)) return;
 

@@ -3,11 +3,17 @@
 var Closer = (window.Closer ||= {});
 
 // 让位检测：我们不抢，我们排队。
-// click 那一刻拍一张快照，下一帧再拍一张，比出页面有没有自己动手。
-// 页面动过之后还要记住它动出来的那一层：下一次点击就落在那层里面（case 006）。
-
-const SHELL_COVER = 0.9; // 一层要盖住 90% 视口，才算「它把屏幕接管了」
-const SHELL_DEPTH = 8; // 找那一层时最多看 8 层祖先
+//
+// 判断器只问「这张图值不值得看」（元素与祖先链，O1 / D10）；页面此刻在做什么，归这里。
+// 这里有两类信号，回答两个不同的问题，不要混在一起：
+//   · 增量（snapshot / acted）：页面对「这一下点击」做了什么。
+//     点击那一刻拍一张快照，下一帧再拍一张，比出页面有没有自己动手。
+//     就地放大、整卡 JS 事件只能这样看——页面动手之前，屏幕上什么都看不出来。
+//   · 电平（shelled → onTopLayer）：图此刻是不是站在页面自己的顶层上。
+//     站点自带查看器开着时，之后每一次点击都落在它里面，这只能读此刻的屏幕，
+//     不能靠「看见页面开它」去记——打开它的那一下常常根本没经过我们（cases 014）。
+//   曾经这里有一整套「记住页面开出来的那一层」的机制（state.shell / yielded / remember），
+//   006 / 008 / 009 一路补丁都在给它打；改成读电平之后它没有活可干，整段删除（D43）。
 
 function scrollLocked() {
   // 会触发样式重算，所以放在所有判据的最后。
@@ -86,131 +92,109 @@ Closer.snapshot = function (x, y, img) {
 /**
  * 页面有没有自己动手。返回命中的判据名，没有则空串。
  * 顺序按代价排：字符串比较 → 属性读取 → 布局 → 样式重算。
- *
- * 命中时顺手记住它动出来的那一层。只判「这一次」是不够的：站点开着自己的
- * 查看器时，后续每一次点击都发生在它已经接管的状态里，四项判据全部沉默（case 006）。
  */
 Closer.acted = function (b) {
   if (location.href !== b.href) return 'href';
-  // 站点就地放大的形态：元素没换、位置没动，只有它自己（或它的盒子）被改写了。
-  // 这条同样要 remember：站点改写属性时可能同时挂出一层（iWiki 的查看器既改图、
-  // 又盖一层遮罩），漏记就等于下一次点击又叠一层（cases 007 / 008）。
-  // 也可能一个层都记不下来——知乎把缩略图设成 visibility:hidden，第一次放大走的是
-  // skin 而不是 hit，而它的遮罩是图的兄弟、祖先链一步就到 body（cases 009）。
-  // 记不下层不代表没接管：`remember()` 记不下层也会落「接管过」的账（D31 要用）。
-  if (b.skin && skinChanged(b.skin)) {
-    Closer.remember(document.elementFromPoint(b.x, b.y), b.hit);
-    return 'skin';
-  }
+  // 站点就地放大的形态：元素没换、位置没动，只有它自己（或它的盒子）被改写了（cases 007）。
+  if (b.skin && skinChanged(b.skin)) return 'skin';
   if (!!document.fullscreenElement !== b.fs) return 'fullscreen';
 
   const now = document.elementFromPoint(b.x, b.y);
-  if (now !== b.hit && !Closer.isOurs(now)) {
-    Closer.remember(now, b.hit);
-    return 'hit';
-  }
+  if (now !== b.hit && !Closer.isOurs(now)) return 'hit';
 
-  if (scrollLocked() !== b.locked) {
-    Closer.remember(now, b.hit);
-    return 'scroll';
-  }
+  if (scrollLocked() !== b.locked) return 'scroll';
   return '';
 };
 
-function coversViewport(node) {
-  const r = node.getBoundingClientRect();
-  return r.width >= innerWidth * SHELL_COVER && r.height >= innerHeight * SHELL_COVER;
-}
-
 /**
- * 页面刚刚出手时的那一层。
+ * 这张图此刻该不该交给页面：页面正以它自己的方式展示着它，或者我们根本没法展示。
  *
- * 这不是「这个站点有没有查看器」那种归纳——那是用一次观测去赌整站的行为，
- * 代价是不可解释的整站失效（点卡片展开一下，全站图片从此都打不开）。
- * 这里记的是观测本身：这一刻屏幕上多出来的、盖住视口的那个容器。
- * 归因来自「它是在这次点击之后出现的」，不来自猜测，所以不需要任何阈值
- * 去判断它「像不像查看器」。
- *
- * 传 null 就记不下层：命中点上没有新东西（命中点没变、只是滚动被锁），
- * 说明页面没有把屏幕接管在那张图身上。
- *
- * anchor 是点击**之前**命中点上的元素（`snapshot()` 的 `hit`），用来区分
- * 「页面刚开出来的一层」和「本来就在的全屏外壳」——后者把整个站点都圈在里面，
- * 记成查看器就会让整站失效（cases 008）。
- */
-Closer.remember = function (node, anchor) {
-  // hit / scroll / skin / 迟到纠正几条让位路径都经过这里，所以「本页接管过」在这里落账。
-  // 它与「记住了哪一层」是两件事：层可能根本记不下来——站点把遮罩做成图的兄弟
-  // （cases 009），观测本身仍然成立，之后靠静态存量判据接着用（见 shelled）。
-  Closer.state.yielded = true;
-
-  if (!node || Closer.isOurs(node)) return;
-
-  // ① 从命中点往上找最近的那一层：页面刚盖在屏幕上的容器。
-  let layer = null;
-  for (let n = node, i = 0; n && i < SHELL_DEPTH; i++) {
-    if (n === document.body || n === document.documentElement) return;
-    if (coversViewport(n)) {
-      layer = n;
-      break;
-    }
-    // 命中栈不穿 shadow（case 005），祖先链也不穿：走到 shadow root 就跳到 host。
-    const root = n.getRootNode();
-    n = n.parentElement || (root instanceof ShadowRoot ? root.host : null);
-  }
-  if (!layer) return;
-
-  // ② 遮罩和图常常是兄弟（tdesign 的 `__modal-mask` 与 `__modal-pic`），只记命中点
-  //    落到的那一层，`contains(img)` 永远是假。往上扩到「这一层」的根：父级仍盖住
-  //    视口，且没有把点击前的那张图圈进来（圈进来就说明那层一直在，不是它开出来的）。
-  for (let p = layer.parentElement; p; p = p.parentElement) {
-    if (p === document.body || p === document.documentElement) break;
-    if (!coversViewport(p)) break;
-    if (anchor && p.contains(anchor)) break;
-    layer = p;
-  }
-
-  // ③ 页面本来就在的全屏外壳不算「它接管出来的那一层」，否则 app 外壳会让整站失效。
-  if (anchor && layer.contains(anchor)) return;
-
-  Closer.state.shell = layer;
-};
-
-/**
- * 我们现在是不是正站在页面自己开的那一层里。
- *
- * 只问两件事：那层还在不在、里面是不是这张图。与图片的绘制尺寸、缩放、
- * 平移、加载状态全都无关——站点把图缩到 25%、放大后拖到一边，结论不变。
- *
- * 层被关掉、被卸载、被 display:none 掉：判死并忘掉。状态自愈，
- * 不需要过期时间，也不会留下一个用户看不见的站点名单。
+ * 点击与悬停光标都经过这里（都在 judge() 之后），所以两边口径一致：不开，也不给 zoom-in。
+ * 三件事都是**此刻的状态**，读一次就知道，不依赖我们刚才看见过什么。
  */
 Closer.shelled = function (img) {
   if (document.fullscreenElement) return true; // 全屏时我们开了也看不见
   // 这页上打开过一次却看不见自己（cases 013）：后面每次点击都只会被吃掉，干脆退场。
   // 一次观测换整页让位，只到刷新为止——它是观测不是猜测，不落进暂停列表，也不跨页。
-  // 点击与悬停光标都经过这里，所以两边口径一致：不开，也不给 zoom-in。
   if (Closer.state.unseen) return true;
+  return onTopLayer(img);
+};
 
-  const shell = Closer.state.shell;
-  if (shell) {
-    if (!shell.isConnected || !coversViewport(shell)) {
-      Closer.state.shell = null; // 层被关掉、被卸载：判死并忘掉
-    } else if (shell.contains(img)) {
-      return true;
-    }
+/**
+ * 图是不是正站在页面自己的顶层上。
+ *
+ * 为什么要它（`cases.md` 014）：腾讯文档、HxBuddy 的图片预览都是 `position:fixed`
+ * 铺满视口的一层，图在里面。打开它的那一下点击落在缩略图上——缩略图要么过不了
+ * `judge()`（pointer 光标、太小，`boot.js` 在那里就 return，连快照都不拍），要么预览
+ * 是恢复出来、脚本开的，根本没有那一下点击。于是「页面开过一层」这件事我们一次都没
+ * 记下，之后点预览里的图，我们照样叠一层。
+ *
+ * 所以这里不记，只读：命中栈自上而下，图之下若有一层 `position:fixed`、宽高都盖住
+ * 90% 视口的元素，并且它之下还有不属于它的页面内容，就是「页面在自己的内容之上又盖
+ * 了一层全屏的东西，图站在那层上」。这正是站点自带查看器的结构定义，与站点、框架、
+ * 遮罩与图是不是兄弟、中间夹几层包装、有没有锁滚动、光标写什么都无关。
+ *
+ * 三处必须守住的边界（每一处都有反例，见 `tools/test-yield.mjs`）：
+ *   1. 层取自**命中栈**，不是全树扫描：HxBuddy 有一个 `pointer-events:none` 的 fixed
+ *      全屏 toast 容器（占视口 98.9%），它不接事件，所以不在栈里——全树扫描会把它当成
+ *      顶层，整站失效。
+ *   2. 层之下必须还有页面内容：app 外壳（fixed 全屏、图就在里面、外壳下只有 body）
+ *      不算顶层，否则整站失效。包着这一层的祖先也不算「被压着的内容」。
+ *   3. 层之下那块若是铺满视口、没有子节点的 fixed 空装饰（视差底、渐变），不算内容，
+ *      继续往下看。
+ *
+ * 判不出就不猜：图不在命中栈里（被遮住、在视口外、`pointer-events:none`）时返回 false。
+ * 这条只为「不开」加信心，不会把 judge() 已否决的图救回来（第二条）。
+ *
+ * 代价（D43）：fixed 全屏外壳之下若还垫着**带子节点**的 fixed 层（背景里放 canvas），
+ * 整站的图都会被当成站在顶层上而不开；只在图中心采一个点，页面很短、内容没盖到图中心
+ * 时漏判；只认 `fixed`，不认 `absolute` 的全页查看器（放宽会误伤主内容容器）。
+ */
+function onTopLayer(img) {
+  const COVER = 0.9; // 局部常量：顶层 const 会和其它 content 文件的声明撞车
+  const vw = innerWidth;
+  const vh = innerHeight;
+
+  const covers = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.width >= vw * COVER && r.height >= vh * COVER;
+  };
+  const fixedFull = (el) => getComputedStyle(el).position === 'fixed' && covers(el);
+  const edge = (el) => el === document.body || el === document.documentElement;
+
+  const r = img.getBoundingClientRect();
+  const x = Math.min(Math.max(r.left + r.width / 2, 0), vw - 1);
+  const y = Math.min(Math.max(r.top + r.height / 2, 0), vh - 1);
+
+  let stack;
+  try {
+    stack = document.elementsFromPoint(x, y);
+  } catch {
+    return false;
   }
 
-  // 有的站点根本不建「层」：知乎把遮罩和图做成 <body> 下的兄弟节点，图的祖先链一步
-  // 就到 body，remember() 一个东西也记不下（cases 009）。它留下的唯一痕迹是指针——
-  // 查看器里那张图的 cursor 是 zoom-out。这是**状态**，不是变化：读一次就知道站在
-  // 哪儿，不依赖帧序，也不需要观察窗口。所以它比 skin 更稳：知乎在**我们判定之后**
-  // 才写 style（实测决策帧 2.8 ms、写入 9.4 ms），第 5 判据那天总是晚一步（D31）。
-  //   只认 zoom-out：zoom-in 有方向歧义，只写了样式、没有处理器的图也会声明它（D10）；
-  //   还要 yielded：cursor 是声明不是观测，单独拿它当预言会误伤那类页面（tech-spec c4）。
-  //   观测在先，声明只用来延长观测的寿命。
-  return Closer.state.yielded && getComputedStyle(img).cursor === 'zoom-out';
-};
+  // 从图开始往下读：图之上的东西一概不看。
+  const at = stack.indexOf(img);
+  if (at < 0) return false;
+
+  for (let i = at + 1; i < stack.length; i++) {
+    const layer = stack[i];
+    if (edge(layer)) return false; // 走到 body / html 都没遇到层
+    if (!fixedFull(layer)) continue;
+
+    // 层之下还有没有「页面内容」：不包着这一层、也不是空装饰。
+    // body / html 包着一切，所以它们在这里必然被跳过——走到头就等于「下面是空的」，
+    // 也就是这一层是 app 外壳而不是叠在内容之上的查看器（cases 014 的代价清单第 1 条）。
+    for (let j = i + 1; j < stack.length; j++) {
+      const under = stack[j];
+      if (under.contains(layer)) continue; // 包着这一层的祖先，不是被压着的内容
+      if (fixedFull(under) && !under.childElementCount) continue; // 空装饰
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
 
 // 迟到纠正只关心一件事：点击点是不是被页面盖住了。
 // 返回盖住它的那个元素，没被盖住返回 null。
@@ -239,14 +223,12 @@ Closer.covered = function (b) {
  * 打开之后补两次检查，要是这时候被盖住，我们自己关掉。
  * 会闪一下，但比两张查看器叠着强。
  *
- * 慢半拍接管也是接管：同样记住那一层，否则下一次点击又会叠一层。
+ * 不需要记那一层：它挂上之后就是页面自己的顶层，下一次点击由 shelled() 读到。
  */
 Closer.watchLate = function (b, onIntrude) {
   const timers = [600, 1200].map((ms) =>
     setTimeout(() => {
-      const under = Closer.covered(b);
-      if (!under) return;
-      Closer.remember(under, b.hit);
+      if (!Closer.covered(b)) return;
       onIntrude();
     }, ms)
   );

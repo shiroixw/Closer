@@ -570,8 +570,46 @@ if (!ready) {
   );
   check('快捷键不关闭 overlay', hk.stillOpen === true);
 
-  await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  // 我们消费了的键不再往下传（cases 014）：真机上 Esc 关掉我们的 overlay 时，腾讯文档把它自己的
+  // 查看器也关了。探针挂在 document / window 的**冒泡**阶段，模拟页面自己的监听。
+  // 没处理的键（x、带 Alt 的组合）必须原样放行——页面在 overlay 之外的行为一个字节都不改。
+  const leak = await evalx(`(() => {
+    const seen = [];
+    const probe = (e) => seen.push(e.key + (e.altKey ? '+alt' : ''));
+    document.addEventListener('keydown', probe, false);
+    window.addEventListener('keydown', probe, false);
+    // 真实按键的目标是 body 或聚焦元素，不是 window：从 body 派发，才有「捕获先于冒泡」的阶段区分。
+    // （直接派到 window 时两边都在 AT_TARGET，谁先谁后只看注册顺序，测不出我们拦没拦住。）
+    const send = (init) => document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+    send({ key: '·' });
+    send({ key: '·' });
+    send({ key: 'c', ctrlKey: true });
+    send({ key: 'x' });
+    send({ key: 'a', altKey: true });
+    document.removeEventListener('keydown', probe, false);
+    window.removeEventListener('keydown', probe, false);
+    return { seen };
+  })()`);
+  const lk = leak.value || {};
+  check(
+    '被我们消费的键（·、Ctrl+C）页面收不到；没处理的键（x、Alt+a）原样放行',
+    Array.isArray(lk.seen) && !lk.seen.includes('·') && !lk.seen.includes('c') && lk.seen.includes('x') && lk.seen.includes('a+alt'),
+    JSON.stringify(lk.seen)
+  );
+
+  // Esc 关闭时页面的冒泡监听也收不到——这条是真机事故的直接复刻。
+  await evalx(`window.__escSeen = 0;
+    window.__escProbe = (e) => { if (e.key === 'Escape') window.__escSeen++; };
+    window.addEventListener('keydown', window.__escProbe, false);`);
+  await evalx(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
   await sleep(480);
+  const escLeak = await evalx(`(() => {
+    const seen = window.__escSeen;
+    window.removeEventListener('keydown', window.__escProbe, false);
+    return { gone: !document.getElementById('closer'), seen };
+  })()`);
+  check('Esc 关闭我们的 overlay 时，页面收不到这个 Esc（不连带关掉页面自己的层）', escLeak.value?.gone === true && escLeak.value?.seen === 0, JSON.stringify(escLeak.value));
+
   const afterKeys = await evalx(`({
     gone: !document.getElementById('closer'),
     intact: document.documentElement.outerHTML === window.__snap,
