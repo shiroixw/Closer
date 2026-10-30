@@ -50,9 +50,10 @@ Closer.hint = (function () {
   }
 
   function show(img) {
-    // 页面已经在自己那一层里展示它了：不再重复表态
     if (!img.isConnected || Closer.isPaused() || Closer.overlay.isOpen()) return;
     if (!Closer.judge(img)) return; // 打不开的图不给手势：这是光标不说谎的唯一来源
+    // 页面正以它自己的方式展示这张图（cases 014）：点击会交给页面，光标也不该许诺放大。
+    // 与 boot.js 走同一个 shelled()，两边口径不会分叉。
     if (Closer.shelled(img)) return;
     if (getComputedStyle(img).cursor !== 'auto') return; // 页面自己的手势优先
 

@@ -479,9 +479,25 @@ button:hover{background:rgba(63,63,70,.9)}
     'ArrowRight',
   ]);
 
+  // overlay 开着时，按键是我们的：我们消费了的键（调用过 preventDefault 的那些）就不再往下传。
+  //
+  // 为什么要拦传播而不只是 preventDefault：我们在 window 捕获阶段拿键，页面自己的 document /
+  // window 冒泡监听照样会收到同一个 Esc，并且并不都尊重 defaultPrevented。真机实测
+  // （cases 014 的两个页面）：Esc 关掉我们的 overlay 时，腾讯文档把它自己的查看器也关了，
+  // 用户想关一层，结果两层一起没了——这违反第三条（页面属于页面自己：我们关闭的只该是我们）。
+  //
+  // 只拦消费了的键：没处理的键（Tab、字母等）与带修饰键放行的组合原样交回，
+  // 页面在 overlay 之外的行为一个字节都不改。
+  //
+  // 代价：overlay 开着期间，页面对同一批键（Esc、方向键、空格……）的快捷键失效——
+  // 这正是 overlay 全屏时的预期：用户看不见页面，页面不该在背后响应他的按键。
   function onKey(e) {
     if (state !== 'open') return;
+    handleKey(e);
+    if (e.defaultPrevented) e.stopImmediatePropagation();
+  }
 
+  function handleKey(e) {
     const k = e.key;
     const cmd = e.metaKey || e.ctrlKey;
 
