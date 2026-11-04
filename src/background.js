@@ -14,6 +14,7 @@ const FILES = [
   'src/content/yield.js',
   'src/content/meta.js',
   'src/content/bytes.js',
+  'src/content/gallery.js',
   'src/content/overlay.js',
   'src/content/actions.js',
   'src/content/hint.js',

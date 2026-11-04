@@ -17,7 +17,7 @@ Closer.overlay = (function () {
 
   let host = null;
   let shadow = null;
-  let stage, photo, backdrop, bar, panel, toast, infoBtn, copyBtn, saveBtn, closeBtn;
+  let stage, photo, backdrop, bar, panel, toast, countEl, infoBtn, copyBtn, saveBtn, closeBtn;
   let rDims, rShown, rRatio, rSize, pauseBtn;
   let rows = {};
 
@@ -30,6 +30,9 @@ Closer.overlay = (function () {
   let hideTimer = 0;
   let unwatch = null;
   let token = 0; // 晚到的体积探测不许覆盖新图
+  let openedAt = 0;
+  let touched = false;
+  let promptOpen = false;
 
   const CSS = `
 /* 宿主自己的定位与调色板**不在这里**，在 ensure() 的 inline style 里。
@@ -97,6 +100,9 @@ button:hover{background:rgba(63,63,70,.9)}
   border-radius:9px;background:rgba(24,24,27,.9);font-size:12px;
   opacity:0;transition:opacity ${ms(140)}ms ease}
 .toast.on{opacity:1}
+.count{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:12px;
+  opacity:0;transition:opacity ${ms(180)}ms ease;pointer-events:none}
+.count.on{opacity:1}
 `;
 
   const COPY_SVG =
@@ -181,6 +187,7 @@ button:hover{background:rgba(63,63,70,.9)}
         <button class="pause"></button>
       </div>
       <div class="toast" role="status" aria-live="polite"></div>
+      <div class="count" aria-hidden="true"></div>
     `;
 
     backdrop = shadow.querySelector('.backdrop');
@@ -189,6 +196,7 @@ button:hover{background:rgba(63,63,70,.9)}
     bar = shadow.querySelector('.bar');
     panel = shadow.querySelector('.panel');
     toast = shadow.querySelector('.toast');
+    countEl = shadow.querySelector('.count');
     infoBtn = shadow.querySelector('.info');
     copyBtn = shadow.querySelector('.copy');
     saveBtn = shadow.querySelector('.save');
@@ -216,7 +224,29 @@ button:hover{background:rgba(63,63,70,.9)}
     saveBtn.addEventListener('click', onSave);
     pauseBtn.addEventListener('click', onPause);
     photo.addEventListener('dblclick', onDblClick);
-    photo.addEventListener('error', () => close(true)); // 空黑幕比没有更糟（6.8）
+    photo.addEventListener('error', () => close(true, true));
+
+    Closer.gallery.bind({
+      countEl,
+      photo,
+      ms,
+      token: () => token,
+      bumpToken: () => {
+        token += 1;
+      },
+      open: () => state === 'open',
+      setCur: (img, meta) => {
+        cur = { img, meta, href: img.closest('a')?.href || '' };
+      },
+      viewReset: () => {
+        view = { s: 1, tx: 0, ty: 0, r: 0, f: 1 };
+        fit = computeFit();
+      },
+      refit,
+      paintPanel,
+      probeSize,
+      wake,
+    });
 
     // 不再用 bar 的 pointerenter/leave：bar 本体是 pointer-events:none，收不到事件。
     // 悬停与唤回统一由 onMove 里的 hover() 负责。
@@ -283,7 +313,8 @@ button:hover{background:rgba(63,63,70,.9)}
 
     // 占位符而不是字符串拼接：中文的语序是「在 x 上暂停」，拼接会拼出英文语序
     const site = Closer.site();
-    pauseBtn.textContent = site ? Closer.t('pauseOn', [site]) : Closer.t('pauseOnThisSite');
+    if (Closer.isTakeover()) pauseBtn.textContent = Closer.t('yieldBack');
+    else pauseBtn.textContent = site ? Closer.t('pauseOn', [site]) : Closer.t('pauseOnThisSite');
   }
 
   function togglePanel(force) {
@@ -352,8 +383,13 @@ button:hover{background:rgba(63,63,70,.9)}
   }
 
   async function onPause() {
-    await Closer.pauseHere();
-    close(true);
+    if (Closer.isTakeover()) await Closer.handBackHere();
+    else await Closer.pauseHere();
+    close(true, true);
+  }
+
+  function markUsed() {
+    touched = true;
   }
 
   function flash(btn) {
@@ -380,7 +416,10 @@ button:hover{background:rgba(63,63,70,.9)}
     bar.classList.remove('idle');
     clearTimeout(hideTimer);
     if (!panel.hidden) return; // 面板开着时不许淡出
-    hideTimer = setTimeout(() => bar.classList.add('idle'), HIDE_DELAY);
+    hideTimer = setTimeout(() => {
+      bar.classList.add('idle');
+      if (Closer.gallery?.has?.()) countEl.classList.remove('on');
+    }, HIDE_DELAY);
   }
 
   /**
@@ -454,6 +493,7 @@ button:hover{background:rgba(63,63,70,.9)}
     if (drag.onPhoto) {
       view.tx = drag.tx + dx;
       view.ty = drag.ty + dy;
+      markUsed();
       apply('none');
     }
   }
@@ -524,6 +564,18 @@ button:hover{background:rgba(63,63,70,.9)}
 
     if (cmd || e.altKey) return; // 其余带修饰键的组合交回浏览器
 
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      if (Closer.gallery?.has?.()) {
+        const next = Closer.gallery.step(k === 'ArrowLeft' ? -1 : 1);
+        if (next) {
+          e.preventDefault();
+          markUsed();
+          Closer.gallery.swapPhoto(next);
+          return;
+        }
+      }
+    }
+
     // 空格与方向键不拦，页面会在 overlay 背后滚动——用户看不见，关掉才发现人已经走了
     if (SCROLL_KEYS.has(k)) {
       e.preventDefault();
@@ -534,6 +586,10 @@ button:hover{background:rgba(63,63,70,.9)}
     switch (k) {
       case 'Escape':
         e.preventDefault();
+        if (promptOpen) {
+          close(true, true);
+          return;
+        }
         if (!panel.hidden) togglePanel(false);
         else close();
         return;
@@ -639,8 +695,8 @@ button:hover{background:rgba(63,63,70,.9)}
 
   function onWheel(e) {
     if (state !== 'open') return;
-    // 不 preventDefault 页面会照样滚；必须显式 passive:false（6.2）
     e.preventDefault();
+    markUsed();
 
     let dy = e.deltaY;
     if (e.deltaMode === 1) dy *= 16;
@@ -659,8 +715,70 @@ button:hover{background:rgba(63,63,70,.9)}
 
   /* ---------- 开关 ---------- */
 
+  function maybePromptPause() {
+    if (Closer.siteMode() !== 'auto' || touched || performance.now() - openedAt >= 800) return false;
+    if (Closer.wasPausePrompted()) return false;
+    promptOpen = true;
+    panel.hidden = false;
+    infoBtn.setAttribute('aria-expanded', 'true');
+    pauseBtn.textContent = Closer.t('pauseOnThisSite');
+    void Closer.markPausePrompted();
+    wake();
+    return true;
+  }
+
+  function finishClose(instant) {
+    state = 'idle';
+    unbind();
+    clearTimeout(hideTimer);
+    if (unwatch) {
+      unwatch();
+      unwatch = null;
+    }
+
+    const m = cur?.meta;
+    const src = cur?.img;
+    const r = src?.isConnected ? src.getBoundingClientRect() : null;
+    const usable = !!(r && r.width > 0 && r.height > 0);
+
+    backdrop.classList.remove('in');
+    promptOpen = false;
+
+    if (instant || !m || reduced.matches) return teardown();
+    if (!usable) return fadeOut();
+
+    view.s = r.width / m.nw;
+    view.tx = r.left + r.width / 2 - innerWidth / 2;
+    view.ty = r.top + r.height / 2 - innerHeight / 2;
+    view.r = 0;
+    view.f = 1;
+    apply(`transform ${ms(260)}ms ${EASE}`);
+
+    photo.addEventListener('transitionend', teardown, { once: true });
+    setTimeout(teardown, 400);
+  }
+
+  function close(instant, force) {
+    if (state !== 'open') return;
+    if (!force && !promptOpen) {
+      const quick = !touched && performance.now() - openedAt < 800;
+      if (quick && Closer.siteMode() === 'auto' && maybePromptPause()) return;
+    }
+    if (promptOpen && !force) {
+      promptOpen = false;
+      panel.hidden = true;
+      infoBtn.setAttribute('aria-expanded', 'false');
+    }
+    finishClose(instant);
+  }
+
+  /* ---------- 开关 ---------- */
+
   function open(img, baseline) {
-    if (state === 'open') return;
+    if (state === 'open') {
+      if (host?.isConnected) return;
+      state = 'idle';
+    }
 
     const m = Closer.meta(img);
     if (!m.nw || !m.nh) return;
@@ -671,6 +789,11 @@ button:hover{background:rgba(63,63,70,.9)}
     base = baseline;
     view = { s: 1, tx: 0, ty: 0, r: 0, f: 1 };
     fit = computeFit();
+    openedAt = performance.now();
+    touched = false;
+    promptOpen = false;
+
+    Closer.gallery?.collect?.(img);
 
     // 尺寸先按原始像素写上，避免等 decode 造成跳动（6.8）
     photo.style.width = `${m.nw}px`;
@@ -697,6 +820,7 @@ button:hover{background:rgba(63,63,70,.9)}
     togglePanel(false);
     setBackdrop(Closer.state.prefs.backdrop || 'dark');
     paintPanel();
+    Closer.gallery.paintCount();
     wake();
     bind();
 
@@ -721,38 +845,11 @@ button:hover{background:rgba(63,63,70,.9)}
 
     token += 1;
     probeSize(m, token);
-    unwatch = Closer.watchLate(base, () => close(true));
-  }
-
-  function close(instant) {
-    if (state !== 'open') return;
-    state = 'idle';
-    unbind();
-    clearTimeout(hideTimer);
-    if (unwatch) {
-      unwatch();
-      unwatch = null;
-    }
-
-    const m = cur?.meta;
-    const src = cur?.img;
-    const r = src?.isConnected ? src.getBoundingClientRect() : null;
-    const usable = !!(r && r.width > 0 && r.height > 0);
-
-    backdrop.classList.remove('in');
-
-    if (instant || !m || reduced.matches) return teardown();
-    if (!usable) return fadeOut();
-
-    view.s = r.width / m.nw;
-    view.tx = r.left + r.width / 2 - innerWidth / 2;
-    view.ty = r.top + r.height / 2 - innerHeight / 2;
-    view.r = 0;
-    view.f = 1;
-    apply(`transform ${ms(260)}ms ${EASE}`);
-
-    photo.addEventListener('transitionend', teardown, { once: true });
-    setTimeout(teardown, 400); // transitionend 不保证来
+    const onIntrude = () => {
+      close(true, true);
+      if (Closer.isTakeover()) void Closer.noteTakeoverFail();
+    };
+    unwatch = Closer.isTakeover() ? Closer.watchFast(base, onIntrude) : Closer.watchLate(base, onIntrude);
   }
 
   function fadeOut() {
@@ -773,6 +870,8 @@ button:hover{background:rgba(63,63,70,.9)}
     host.remove(); // 关掉之后页面 DOM 必须逐字节还原
     Closer.state.host = null;
     cur = null;
+    promptOpen = false;
+    Closer.gallery?.reset?.();
   }
 
   /**
@@ -788,6 +887,7 @@ button:hover{background:rgba(63,63,70,.9)}
     open,
     close,
     syncBackdrop,
-    isOpen: () => state === 'open',
+    say,
+    isOpen: () => state === 'open' && !!(host && host.isConnected),
   };
 })();

@@ -17,8 +17,16 @@
 </div>
 
 <div class="row">
+  <span data-i18n="modeLabel"></span>
+  <span class="seg" id="siteMode">
+    <button data-m="auto" aria-pressed="true" data-i18n="modeAuto"></button>
+    <button data-m="takeover" aria-pressed="false" data-i18n="modeTakeover"></button>
+    <button data-m="paused" aria-pressed="false" data-i18n="modePaused"></button>
+  </span>
+</div>
+
+<div class="row">
   <span class="host" id="host">—</span>
-  <button id="pause" disabled data-i18n="pause"></button>
 </div>
 
 <div class="row">
@@ -30,6 +38,7 @@
   </span>
 </div>
 
+<p class="note" id="modeHint"></p>
 <p class="note" data-i18n-html="popupNote"></p>
 
 <script src="i18n.js"></script>

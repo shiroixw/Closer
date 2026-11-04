@@ -151,14 +151,15 @@ const popupText = await evalIn(
   `({
      status: document.querySelector('#statusText')?.textContent?.trim() || '',
      backdrops: document.querySelectorAll('#backdrop button').length,
+     modes: document.querySelectorAll('#siteMode button').length,
      statusBrush: document.querySelectorAll('[data-v]').length
    })`
 );
 
 check(
-  'G2b popup 渲染出状态与三档背板',
-  popupText?.status?.length > 0 && popupText?.backdrops === 3,
-  popupText ? `状态「${popupText.status}」· 背板 ${popupText.backdrops} 个` : '页面没响应'
+  'G2b popup 渲染出状态、三档背板与站点三态',
+  popupText?.status?.length > 0 && popupText?.backdrops === 3 && popupText?.modes === 3,
+  popupText ? `状态「${popupText.status}」· 背板 ${popupText.backdrops} · 三态 ${popupText.modes}` : '页面没响应'
 );
 
 /* ---------- G3 未授权 = 什么都不做（D6） ---------- */

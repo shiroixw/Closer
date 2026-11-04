@@ -152,5 +152,43 @@
   },
   "saveFailed": {
     "message": "保存失败"
+  },
+
+  "modeLabel": {
+    "message": "这一站"
+  },
+  "modeAuto": {
+    "message": "自动"
+  },
+  "modeTakeover": {
+    "message": "接管"
+  },
+  "modePaused": {
+    "message": "已暂停"
+  },
+  "modeAutoHint": {
+    "message": "没有查看器的页面由我打开；有查看器的让给它。"
+  },
+  "yieldBack": {
+    "message": "交还页面"
+  },
+  "yieldedNote": {
+    "message": "本页已让位给页面自己的查看器。"
+  },
+  "takeoverBlocked": {
+    "message": "这一站拦不住页面，已恢复让位。"
+  },
+  "galleryCount": {
+    "message": "$I$ / $N$",
+    "placeholders": {
+      "i": {
+        "content": "$1",
+        "example": "3"
+      },
+      "n": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
   }
 }

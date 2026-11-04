@@ -102,6 +102,7 @@ const PAGE = `<!doctype html>
 <div id="frame"><img id="covered" src="/img.png"><div id="shade"></div></div>
 <img id="own" src="/img.png">
 <div id="shadow-frame"></div>
+<div id="gal"><img class="g" src="/img.png"><img class="g" src="/img2.png"><img class="g" src="/img3.png"></div>
 <script>
 window.chrome = {
   storage: {
@@ -138,6 +139,7 @@ window.__snap = null;
 <script src="/js/meta.js"></script>
 <script src="/js/bytes.js"></script>
 <script src="/js/yield.js"></script>
+<script src="/js/gallery.js"></script>
 <script src="/js/overlay.js"></script>
 <script src="/js/actions.js"></script>
 <script src="/js/hint.js"></script>
@@ -145,6 +147,13 @@ window.__snap = null;
 <script>
 (async () => {
   await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
+  for (let i = 0; i < 40; i++) {
+    if (Closer.state?.ready) {
+      Closer.state.pausePromptedHere = true;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
   window.__snap = document.documentElement.outerHTML;
   window.__ready = true;
 })();
@@ -155,8 +164,8 @@ const server = http
   .createServer((req, res) => {
     const url = req.url.split('?')[0];
 
-    if (url === '/img.png' || url === '/avatar.png') {
-      const buf = url === '/img.png' ? BIG : SMALL;
+    if (url === '/img.png' || url === '/avatar.png' || url === '/img2.png' || url === '/img3.png') {
+      const buf = url === '/img.png' || url === '/img2.png' || url === '/img3.png' ? BIG : SMALL;
       res.writeHead(200, { 'content-type': 'image/png', 'content-length': buf.length });
       return res.end(buf);
     }
@@ -700,6 +709,45 @@ if (!ready) {
   const hintUnseen = await evalx(`document.getElementById('big').style.cursor`);
   check('之后也不给 zoom-in 光标（光标不说谎）', hintUnseen.value === '', String(hintUnseen.value));
   await evalx(`window.__hider.disconnect()`);
+
+  // 11. 图集漫游：同容器 ←/→、边界、计数、关闭后 DOM 还原
+  await evalx(`(() => {
+    document.documentElement.removeAttribute('lang');
+    document.getElementById('hostile')?.remove();
+    window.__hider?.disconnect();
+    Closer.state.unseen = false;
+    Closer.overlay?.close?.(true, true);
+    document.getElementById('closer')?.remove();
+  })()`);
+  await evalx(`Promise.all([...document.querySelectorAll('#gal img')].map((i) => i.decode().catch(() => {})))`);
+  const galPre = (await evalx(`(() => {
+    const img = document.querySelector('#gal .g');
+    return { j: Closer.judge(img), shelled: Closer.shelled(img), unseen: Closer.state.unseen, idle: Closer.state.ready && !Closer.isPaused() && !Closer.overlay.isOpen() };
+  })()`)).value;
+  check('图集：预检 idle', galPre?.idle === true && galPre?.j === true, JSON.stringify(galPre));
+  const galRun = (await evalx(`(() => {
+    const g = document.getElementById('gal');
+    g.scrollIntoView({ block: 'center' });
+    window.__snapG = document.documentElement.outerHTML;
+    const img = document.querySelector('#gal .g');
+    const r = img.getBoundingClientRect();
+    Closer.overlay.open(img, Closer.snapshot(r.left + r.width / 2, r.top + r.height / 2, img));
+    const base = { open: Closer.overlay.isOpen(), has: Closer.gallery.has(), c: Closer.gallery.count() };
+    if (!base.open || !base.has) return { ...base, step: 'open' };
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    const right = Closer.gallery.count();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    const bound = Closer.gallery.count();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return { ...base, right, bound, intact: document.documentElement.outerHTML === window.__snapG };
+  })()`)).value;
+  check('图集：打开且有多张', galRun?.open === true && galRun?.has === true, JSON.stringify(galRun));
+  check('图集：→ 到 2/3', galRun?.right?.[0] === 2 && galRun?.right?.[1] === 3, JSON.stringify(galRun?.right));
+  check('图集：边界停在 3/3', galRun?.bound?.[0] === 3, JSON.stringify(galRun?.bound));
+  await sleep(520);
+  const galDone = (await evalx(`!document.getElementById('closer') && document.documentElement.outerHTML === window.__snapG`)).value;
+  check('图集：关闭后 DOM 逐字节一致', galDone === true, String(galDone));
 }
 
 ws.close();

@@ -7,6 +7,7 @@
 var Closer = (window.Closer ||= {});
 
 const PAUSED_KEY = 'closer:paused';
+const TAKEOVER_KEY = 'closer:takeover';
 const PREFS_KEY = 'closer:prefs';
 
 const DEFAULT_PREFS = { backdrop: 'dark' };
@@ -52,20 +53,26 @@ function covers(entry, host) {
 Closer.state = {
   ready: false, // 偏好是否读完。没读完时一律放行，杜绝竞态
   paused: false, // 当前站点是否被暂停
+  takeover: false, // 当前站点是否为接管态
   prefs: { ...DEFAULT_PREFS },
   host: null, // overlay 的 shadow host，由 overlay.js 建立
   unseen: false, // 本页打开过、却看不见自己（cases 013）。之后整页让位，见 shelled()
+  lastYield: false, // 本会话内最近一次让位（不进 storage，刷新即清）
+  takeoverFails: 0,
+  pausePromptedHere: false,
 };
 
 /* ---------- 加载 ---------- */
 
 Closer.load = async function () {
   let paused = [];
+  let takeover = [];
   let prefs = DEFAULT_PREFS;
 
   try {
-    const got = await chrome.storage.local.get([PAUSED_KEY, PREFS_KEY]);
+    const got = await chrome.storage.local.get([PAUSED_KEY, TAKEOVER_KEY, PREFS_KEY]);
     if (Array.isArray(got[PAUSED_KEY])) paused = got[PAUSED_KEY];
+    if (Array.isArray(got[TAKEOVER_KEY])) takeover = got[TAKEOVER_KEY];
     if (got[PREFS_KEY] && typeof got[PREFS_KEY] === 'object') {
       prefs = { ...DEFAULT_PREFS, ...got[PREFS_KEY] };
     }
@@ -76,47 +83,67 @@ Closer.load = async function () {
   const site = Closer.site();
   Closer.state.prefs = prefs;
   Closer.state.paused = paused.some((entry) => covers(entry, site));
+  Closer.state.takeover = !Closer.state.paused && takeover.some((entry) => covers(entry, site));
   Closer.state.ready = true;
   return Closer.state;
 };
 
-/* ---------- 暂停 ---------- */
+Closer.siteMode = function () {
+  if (Closer.state.paused) return 'paused';
+  if (Closer.state.takeover) return 'takeover';
+  return 'auto';
+};
 
-Closer.pauseHere = async function () {
+Closer.setSiteMode = async function (mode) {
   const site = Closer.site();
   if (!site) return;
-
+  let paused = [];
+  let takeover = [];
   try {
-    const got = await chrome.storage.local.get(PAUSED_KEY);
-    const list = Array.isArray(got[PAUSED_KEY]) ? got[PAUSED_KEY] : [];
-    if (!list.includes(site)) {
-      list.push(site);
-      await chrome.storage.local.set({ [PAUSED_KEY]: list });
-    }
+    const got = await chrome.storage.local.get([PAUSED_KEY, TAKEOVER_KEY]);
+    if (Array.isArray(got[PAUSED_KEY])) paused = got[PAUSED_KEY];
+    if (Array.isArray(got[TAKEOVER_KEY])) takeover = got[TAKEOVER_KEY];
   } catch {
     return;
   }
+  paused = paused.filter((e) => !covers(e, site));
+  takeover = takeover.filter((e) => !covers(e, site));
+  if (mode === 'paused') paused.push(site);
+  else if (mode === 'takeover') takeover.push(site);
 
-  Closer.state.paused = true;
-};
-
-Closer.resumeHere = async function () {
-  const site = Closer.site();
-  if (!site) return;
-
-  try {
-    const got = await chrome.storage.local.get(PAUSED_KEY);
-    const list = Array.isArray(got[PAUSED_KEY]) ? got[PAUSED_KEY] : [];
-    const next = list.filter((entry) => !covers(entry, site));
-    await chrome.storage.local.set({ [PAUSED_KEY]: next });
-  } catch {
-    return;
+  Closer.state.paused = mode === 'paused';
+  Closer.state.takeover = mode === 'takeover';
+  if (Closer.state.paused) {
+    Closer.hint?.reset?.();
+    if (Closer.overlay?.isOpen?.()) Closer.overlay.close(true);
   }
 
-  Closer.state.paused = false;
+  try {
+    await chrome.storage.local.set({ [PAUSED_KEY]: paused, [TAKEOVER_KEY]: takeover });
+  } catch {
+    /* 写不进去不影响本次会话 */
+  }
 };
 
+Closer.noteTakeoverFail = function () {
+  Closer.state.takeoverFails += 1;
+  if (Closer.state.takeoverFails < 2) return;
+  Closer.state.takeoverFails = 0;
+  void Closer.setSiteMode('auto').then(() => Closer.overlay?.say?.(Closer.t('takeoverBlocked')));
+};
+
+Closer.pauseHere = () => Closer.setSiteMode('paused');
+Closer.resumeHere = () => Closer.setSiteMode('auto');
+Closer.markPausePrompted = function () {
+  Closer.state.pausePromptedHere = true;
+};
+Closer.wasPausePrompted = () => Closer.state.pausePromptedHere;
 Closer.isPaused = () => Closer.state.paused;
+Closer.isTakeover = () => Closer.state.takeover;
+Closer.handBackHere = () => {
+  Closer.state.takeoverFails = 0;
+  return Closer.setSiteMode('auto');
+};
 
 /* ---------- 偏好 ---------- */
 
@@ -141,9 +168,17 @@ try {
       const list = changes[PAUSED_KEY].newValue;
       const site = Closer.site();
       Closer.state.paused = Array.isArray(list) && list.some((entry) => covers(entry, site));
+      if (Closer.state.paused) Closer.state.takeover = false;
       if (Closer.state.paused && Closer.overlay?.isOpen?.()) Closer.overlay.close();
       // 暂停要立刻生效，连悬停出来的光标一起收（D32）
       if (Closer.state.paused) Closer.hint?.reset?.();
+    }
+
+    if (changes[TAKEOVER_KEY]) {
+      const list = changes[TAKEOVER_KEY].newValue;
+      const site = Closer.site();
+      Closer.state.takeover =
+        !Closer.state.paused && Array.isArray(list) && list.some((entry) => covers(entry, site));
     }
 
     if (changes[PREFS_KEY] && changes[PREFS_KEY].newValue) {
