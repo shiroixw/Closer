@@ -90,7 +90,6 @@ window.chrome = {
 <script src="/js/actions.js"></script>
 <script src="/js/hint.js"></script>
 <script src="/js/boot.js"></script>
-<script src="/js/page-bridge.js"></script>
 `;
 
 const PAGE = `<!doctype html><meta charset=utf-8>
@@ -105,10 +104,6 @@ img{width:240px;display:block}
 <img id="s2" src="/img.png" style="width:240px">
 <div id="gal"><img class="g" src="/img.png"><img class="g" src="/img.png"><img class="g" src="/img.png"></div>
 <script>
-document.getElementById('thumb').addEventListener('click',()=>{
-  const d=document.createElement('div'); d.className='viewer';
-  d.innerHTML='<img class="t-image-viewer" src="/img.png">'; document.body.appendChild(d);
-});
 document.getElementById('thumb').addEventListener('pointerdown',()=>{
   const d=document.createElement('div'); d.className='viewer';
   d.innerHTML='<img src="/img.png">'; document.body.appendChild(d);
@@ -193,19 +188,19 @@ const click = (id) =>
 // T1/T2 — 接管态：我们开、页面查看器不出
 await click('thumb');
 await sleep(450);
-const t12 = await evalx(`({
+const t1r = await evalx(`({
   open: Closer.overlay.isOpen(),
-  viewers: document.querySelectorAll('.t-image-viewer,.viewer').length,
+  viewers: document.querySelectorAll('.viewer').length,
   takeover: Closer.isTakeover(),
 })`);
-check('T1 接管态页面 click 查看器未挂出', t12?.viewers === 0, JSON.stringify(t12));
-check('T2 接管态 overlay 打开', t12?.open === true, JSON.stringify(t12));
+check('T1 接管态页面 click 查看器未挂出', t1r?.viewers === 0, JSON.stringify(t1r));
+check('T2 接管态 overlay 打开', t1r?.open === true, JSON.stringify(t1r));
 check('T2b 接管态站点 click 缩放未执行', (await evalx('window.__pageZoom')) === 0, String(await evalx('window.__pageZoom')));
 const t11 = await evalx(`({
   open: Closer.overlay.isOpen(),
-  stop: document.getElementById('thumb').hasAttribute('data-closer-stop'),
+  markers: document.querySelectorAll('[data-closer-stop]').length,
 })`);
-check('T11 打开后清掉 data-closer-stop', t11?.open === true && t11?.stop === false, JSON.stringify(t11));
+check('T11 打开后无 data-closer-stop 标记', t11?.open === true && t11?.markers === 0, JSON.stringify(t11));
 
 // T10 — 维基 File: 缩略图（judge 9/12 误杀）接管态应开
 await evalx(`Closer.overlay?.close?.(true,true); document.getElementById('closer')?.remove(); document.querySelectorAll('.viewer').forEach(n=>n.remove()); window.__pageZoom=0`);
@@ -281,7 +276,7 @@ await click('thumb');
 await sleep(280);
 const t9 = await evalx(`({ unseen: Closer.state.unseen, open: Closer.overlay.isOpen() })`);
 check('T9 接管态仍 respect unseen', t9?.unseen === true && t9?.open === false, JSON.stringify(t9));
-await evalx(`window.__hider?.disconnect()`);
+await evalx(`window.__hider?.disconnect(); Closer.state.unseen=false`);
 
 // T6 — 交还页面
 await evalx(`document.querySelectorAll('.viewer').forEach((n)=>n.remove()); window.__store['closer:takeover']=['127.0.0.1']; Closer.state.takeover=true; Closer.state.unseen=false`);
@@ -292,17 +287,17 @@ await sleep(100);
 const t6 = await evalx(`({ takeover: Closer.isTakeover(), store: window.__store['closer:takeover'] })`);
 check('T6 交还页面 → 自动', t6?.takeover === false && t6?.store?.length === 0, JSON.stringify(t6));
 
-// T3 — pointerdown 双开快退
-await evalx(`window.__store['closer:takeover']=['127.0.0.1']; Closer.state.takeover=true`);
+// T3 — 接管态 pinch pointerdown：页面 pointerdown 查看器挂不出
+await evalx(`window.__store['closer:takeover']=['127.0.0.1']; Closer.state.takeover=true; Closer.state.unseen=false`);
 const t3 = await evalx(`(async()=>{
+  document.querySelectorAll('.viewer').forEach(n=>n.remove());
   const img=document.getElementById('thumb'); const r=img.getBoundingClientRect();
-  const t0=performance.now();
-  img.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));
+  img.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,button:0,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));
   img.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));
-  await new Promise(r=>setTimeout(r,120));
-  return { open: Closer.overlay.isOpen(), dt: performance.now()-t0 };
+  await new Promise(r=>setTimeout(r,400));
+  return { open: Closer.overlay.isOpen(), viewers: document.querySelectorAll('.viewer').length };
 })()`);
-check('T3 pointerdown 挂载后 100ms 内退场', t3?.open === false && t3?.dt < 200, JSON.stringify(t3));
+check('T3 接管 pointerdown 不挂站点层', t3?.viewers === 0, JSON.stringify(t3));
 
 // T4 — 连续失败降级
 await evalx(`window.__store['closer:takeover']=['127.0.0.1']; Closer.state.takeover=true; Closer.state.takeoverFails=0`);

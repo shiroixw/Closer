@@ -79,7 +79,7 @@ for (const p of manifest.optional_host_permissions ?? []) {
 // 此前这个数字数的是**原样字节**，注释占了一半，于是五次修正（40 → 60 → 64 → 66 →
 // 72 → 80）都是同一个形状：注释写完整 → 超了 → 抬数字。口径换了，那个循环才停。
 // 原样字节照样印出来，那个数字才对得上商店包与 View source。
-const BUDGET_CODE = 45 * 1024;
+const BUDGET_CODE = 44 * 1024;
 const MAX_FILE_CODE = BUDGET_CODE / 2; // 单文件不得吃掉总量的一半：结构上就不允许一个文件变成项目
 const contentFiles = [];
 const walk = (dir) => {
@@ -100,13 +100,13 @@ if (contentFiles.length) {
   const raw = sizes.reduce((n, f) => n + f.raw, 0);
 
   warnings.push(
-    `content 侧有效代码 ${kb(code)} KB / 45 KB（注释 ${kb(raw - code)} KB 与空行不计入；原样 ${kb(raw)} KB）`
+    `content 侧有效代码 ${kb(code)} KB / 44 KB（注释 ${kb(raw - code)} KB 与空行不计入；原样 ${kb(raw)} KB）`
   );
   // 逐文件印出来：总量红的时候，这一行直接指出膨胀点在哪，不用再猜
   warnings.push(`  ${sizes.map((f) => `${f.name} ${kb(f.code)}`).join(' · ')}`);
 
   if (code > BUDGET_CODE) {
-    errors.push(`content 侧有效代码 ${kb(code)} KB 超过 45 KB 预算（宪法第六条 B 表）：按第九条先砍功能`);
+    errors.push(`content 侧有效代码 ${kb(code)} KB 超过 44 KB 预算（宪法第六条 B 表）：按第九条先砍功能`);
   }
   for (const f of sizes) {
     if (f.code > MAX_FILE_CODE) {

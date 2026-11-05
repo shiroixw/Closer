@@ -6,10 +6,6 @@ var Closer = (window.Closer ||= {});
 // 时序底线：click → open 之间只隔一次 rAF，中间不许出现 await（技术方案 2）。
 
 (function () {
-  /**
-   * rAF 与 32ms 定时器谁先到用谁：
-   * 后台标签页里 rAF 不一定会触发，只挂 rAF 会永远不开。
-   */
   function settle(fn) {
     let done = false;
     const run = () => {
@@ -21,15 +17,10 @@ var Closer = (window.Closer ||= {});
     setTimeout(run, 32);
   }
 
-  /**
-   * 按下那一刻的现场。click 只能告诉我们「点完了」，
-   * 而「这是不是一次点击」必须在按下时就记下来——选区在 mousedown 时就被折叠了，
-   * 到 click 再问一定得到空字符串。
-   */
   let down = null;
 
-  const DRAG_SLOP = 6; // 位移超过 6 px 是在拖，不是在点
-  const HOLD_MS = 600; // 按住超过 600 ms 是在读，不是在点
+  const DRAG_SLOP = 6;
+  const HOLD_MS = 600;
   const WIKI_FILE = /\/wiki\/File:|title=File:/i;
 
   function passOpen(img) {
@@ -52,6 +43,13 @@ var Closer = (window.Closer ||= {});
     return false;
   }
 
+  /** 接管态：隔离开 world 的 stopPropagation 会拦住页面 listener；不依赖 MAIN world 顺序。 */
+  function pinchPage(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+  }
+
   function onPointerDown(e) {
     down = null;
     if (e.button !== 0) return;
@@ -62,23 +60,12 @@ var Closer = (window.Closer ||= {});
     try {
       sel = !!String(getSelection() || '').trim();
     } catch {
-      /* 拿不到选区就当没有，按第二条偏向打开 */
+      /* 拿不到选区就当没有 */
     }
     const target = e.composedPath()[0];
     const img = Closer.pick(target, e.clientX, e.clientY);
-    let stopEl = null;
-    if (Closer.isTakeover() && img && passOpen(img)) {
-      stopEl = img;
-      stopEl.setAttribute('data-closer-stop', '');
-    }
-    down = { x: e.clientX, y: e.clientY, t: e.timeStamp, sel, stopEl };
-  }
-
-  function clearStop(el) {
-    if (!el) return;
-    const run = () => el.removeAttribute('data-closer-stop');
-    queueMicrotask(run);
-    setTimeout(run, 0);
+    if (Closer.isTakeover() && img && passOpen(img)) pinchPage(e);
+    down = { x: e.clientX, y: e.clientY, t: e.timeStamp, sel };
   }
 
   function shouldYield(img, force) {
@@ -94,40 +81,20 @@ var Closer = (window.Closer ||= {});
 
     if (e.button !== 0) return;
     const force = e.altKey;
-    if (skipMods(e, true)) {
-      clearStop(d?.stopEl);
-      return;
-    }
-
-    if (!idle()) {
-      clearStop(d?.stopEl);
-      return;
-    }
+    if (skipMods(e, true)) return;
+    if (!idle()) return;
 
     if (d) {
-      if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) {
-        clearStop(d?.stopEl);
-        return;
-      }
-      if (e.timeStamp - d.t > HOLD_MS) {
-        clearStop(d?.stopEl);
-        return;
-      }
-      if (d.sel) {
-        clearStop(d?.stopEl);
-        return;
-      }
+      if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) return;
+      if (e.timeStamp - d.t > HOLD_MS) return;
+      if (d.sel) return;
     }
 
     const target = e.composedPath()[0];
     const img = Closer.pick(target, e.clientX, e.clientY);
-    if (!img || !passOpen(img)) {
-      clearStop(d?.stopEl);
-      return;
-    }
+    if (!img || !passOpen(img)) return;
 
     if (shouldYield(img, force)) {
-      clearStop(d?.stopEl);
       if (!force && Closer.siteMode() === 'auto') Closer.state.lastYield = true;
       return;
     }
@@ -135,16 +102,11 @@ var Closer = (window.Closer ||= {});
     Closer.hint?.reset?.();
 
     const intercept = Closer.isTakeover() || force;
-    if (intercept) img.setAttribute('data-closer-stop', '');
-
     const base = Closer.snapshot(e.clientX, e.clientY, img);
-    if (intercept) {
-      e.stopImmediatePropagation();
-    }
-    e.preventDefault();
+    if (intercept) pinchPage(e);
+    else e.preventDefault();
 
     settle(() => {
-      clearStop(img);
       if (!Closer.acted(base)) Closer.overlay.open(img, base);
     });
   }
