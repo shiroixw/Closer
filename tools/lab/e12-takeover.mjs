@@ -89,8 +89,8 @@ window.chrome = {
 <script src="/js/overlay.js"></script>
 <script src="/js/actions.js"></script>
 <script src="/js/hint.js"></script>
-<script src="/js/page-bridge.js"></script>
 <script src="/js/boot.js"></script>
+<script src="/js/page-bridge.js"></script>
 `;
 
 const PAGE = `<!doctype html><meta charset=utf-8>
@@ -201,6 +201,11 @@ const t12 = await evalx(`({
 check('T1 接管态页面 click 查看器未挂出', t12?.viewers === 0, JSON.stringify(t12));
 check('T2 接管态 overlay 打开', t12?.open === true, JSON.stringify(t12));
 check('T2b 接管态站点 click 缩放未执行', (await evalx('window.__pageZoom')) === 0, String(await evalx('window.__pageZoom')));
+const t11 = await evalx(`({
+  open: Closer.overlay.isOpen(),
+  stop: document.getElementById('thumb').hasAttribute('data-closer-stop'),
+})`);
+check('T11 打开后清掉 data-closer-stop', t11?.open === true && t11?.stop === false, JSON.stringify(t11));
 
 // T10 — 维基 File: 缩略图（judge 9/12 误杀）接管态应开
 await evalx(`Closer.overlay?.close?.(true,true); document.getElementById('closer')?.remove(); document.querySelectorAll('.viewer').forEach(n=>n.remove()); window.__pageZoom=0`);

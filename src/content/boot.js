@@ -66,7 +66,6 @@ var Closer = (window.Closer ||= {});
     }
     const target = e.composedPath()[0];
     const img = Closer.pick(target, e.clientX, e.clientY);
-    let skinBase = null;
     let stopEl = null;
     if (Closer.isTakeover() && img && passOpen(img)) {
       stopEl = img;
@@ -95,14 +94,29 @@ var Closer = (window.Closer ||= {});
 
     if (e.button !== 0) return;
     const force = e.altKey;
-    if (skipMods(e, true)) return;
+    if (skipMods(e, true)) {
+      clearStop(d?.stopEl);
+      return;
+    }
 
-    if (!idle()) return;
+    if (!idle()) {
+      clearStop(d?.stopEl);
+      return;
+    }
 
     if (d) {
-      if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) return;
-      if (e.timeStamp - d.t > HOLD_MS) return;
-      if (d.sel) return;
+      if (Math.abs(e.clientX - d.x) > DRAG_SLOP || Math.abs(e.clientY - d.y) > DRAG_SLOP) {
+        clearStop(d?.stopEl);
+        return;
+      }
+      if (e.timeStamp - d.t > HOLD_MS) {
+        clearStop(d?.stopEl);
+        return;
+      }
+      if (d.sel) {
+        clearStop(d?.stopEl);
+        return;
+      }
     }
 
     const target = e.composedPath()[0];

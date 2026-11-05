@@ -52,9 +52,19 @@ async function registered() {
 async function sync() {
   const [has, hasScript] = await Promise.all([granted(), registered()]);
 
-  if (has && !hasScript) {
+  if (has) {
     try {
+      // 每次 sync 重注册：更新脚本顺序/内容；bridge 必须在 isolated 之后，否则 click 被 bridge 先吃掉、Closer 永远不开。
+      await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID, PAGE_BRIDGE_ID] }).catch(() => {});
       await chrome.scripting.registerContentScripts([
+        {
+          id: SCRIPT_ID,
+          matches: ['*://*/*'],
+          js: FILES,
+          runAt: 'document_start',
+          allFrames: false,
+          persistAcrossSessions: true,
+        },
         {
           id: PAGE_BRIDGE_ID,
           matches: ['*://*/*'],
@@ -64,14 +74,6 @@ async function sync() {
           allFrames: false,
           persistAcrossSessions: true,
         },
-        {
-          id: SCRIPT_ID,
-          matches: ['*://*/*'],
-          js: FILES,
-          runAt: 'document_start',
-          allFrames: false, // iframe 里的 overlay 会被裁掉，不如不做
-          persistAcrossSessions: true,
-        },
       ]);
     } catch (e) {
       console.warn('[closer] register failed', e);
@@ -79,7 +81,7 @@ async function sync() {
     return;
   }
 
-  if (!has && hasScript) {
+  if (hasScript) {
     try {
       await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID, PAGE_BRIDGE_ID] });
     } catch (e) {
