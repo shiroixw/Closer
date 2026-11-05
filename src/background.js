@@ -6,6 +6,7 @@
 //   3. 首次安装时打开 welcome
 
 const SCRIPT_ID = 'closer-content';
+const PAGE_BRIDGE_ID = 'closer-page-bridge';
 
 // 加载顺序即执行顺序，不能调换：core 建命名空间，boot 最后接线。
 const FILES = [
@@ -39,8 +40,10 @@ async function granted() {
 
 async function registered() {
   try {
-    const list = await chrome.scripting.getRegisteredContentScripts({ ids: [SCRIPT_ID] });
-    return list.length > 0;
+    const list = await chrome.scripting.getRegisteredContentScripts({
+      ids: [SCRIPT_ID, PAGE_BRIDGE_ID],
+    });
+    return list.length >= 2;
   } catch {
     return false;
   }
@@ -52,6 +55,15 @@ async function sync() {
   if (has && !hasScript) {
     try {
       await chrome.scripting.registerContentScripts([
+        {
+          id: PAGE_BRIDGE_ID,
+          matches: ['*://*/*'],
+          js: ['src/content/page-bridge.js'],
+          runAt: 'document_start',
+          world: 'MAIN',
+          allFrames: false,
+          persistAcrossSessions: true,
+        },
         {
           id: SCRIPT_ID,
           matches: ['*://*/*'],
@@ -69,7 +81,7 @@ async function sync() {
 
   if (!has && hasScript) {
     try {
-      await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] });
+      await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID, PAGE_BRIDGE_ID] });
     } catch (e) {
       console.warn('[closer] unregister failed', e);
     }

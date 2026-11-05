@@ -8,8 +8,6 @@ Closer.gallery = (function () {
   let at = 0;
   let ui = null;
 
-  const keyOf = (img) => img.getAttribute('src') || img.src || '';
-
   function ok(img) {
     return img && img.complete && img.naturalWidth > 0 && Closer.judge(img);
   }
@@ -17,28 +15,20 @@ Closer.gallery = (function () {
   function collect(seed) {
     list = [seed];
     at = 0;
-    let box = seed.parentElement;
-    let best = list;
-    while (box && box !== document.body && box !== document.documentElement) {
+    for (let box = seed.parentElement; box && box !== document.body; box = box.parentElement) {
       const seen = new Set();
       const imgs = [];
       for (const im of box.querySelectorAll('img')) {
         if (!ok(im)) continue;
-        const u = keyOf(im);
+        const u = im.getAttribute('src') || im.src || '';
         if (!u || seen.has(u)) continue;
         seen.add(u);
         imgs.push(im);
       }
-      if (imgs.length > 1) best = imgs.slice(0, MAX);
-      box = box.parentElement;
+      if (imgs.length > 1) list = imgs.slice(0, MAX);
     }
-    list = best;
     at = Math.max(0, list.indexOf(seed));
     return list.length;
-  }
-
-  function count() {
-    return list.length > 1 ? [at + 1, list.length] : null;
   }
 
   function step(d) {
@@ -49,25 +39,24 @@ Closer.gallery = (function () {
     return list[at];
   }
 
-  function reset() {
-    list = [];
-    at = 0;
+  function count() {
+    return list.length > 1 ? [at + 1, list.length] : null;
   }
 
   function bind(h) {
     ui = h;
   }
 
-  function paintCount(show) {
+  function paintCount() {
     if (!ui?.countEl) return;
-    const c = count();
-    if (!c) {
+    const n = list.length;
+    if (n < 2) {
       ui.countEl.textContent = '';
       ui.countEl.classList.remove('on');
       return;
     }
-    ui.countEl.textContent = Closer.t('galleryCount', [String(c[0]), String(c[1])]);
-    ui.countEl.classList.toggle('on', show !== false);
+    ui.countEl.textContent = Closer.t('galleryCount', [String(at + 1), String(n)]);
+    ui.countEl.classList.add('on');
   }
 
   function swapPhoto(img) {
@@ -94,5 +83,17 @@ Closer.gallery = (function () {
     }, ui.ms(140));
   }
 
-  return { collect, step, count, reset, has: () => list.length > 1, bind, paintCount, swapPhoto };
+  return {
+    collect,
+    step,
+    count,
+    reset: () => {
+      list = [];
+      at = 0;
+    },
+    has: () => list.length > 1,
+    bind,
+    paintCount,
+    swapPhoto,
+  };
 })();

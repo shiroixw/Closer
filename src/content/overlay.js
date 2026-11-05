@@ -100,8 +100,7 @@ button:hover{background:rgba(63,63,70,.9)}
   border-radius:9px;background:rgba(24,24,27,.9);font-size:12px;
   opacity:0;transition:opacity ${ms(140)}ms ease}
 .toast.on{opacity:1}
-.count{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:12px;
-  opacity:0;transition:opacity ${ms(180)}ms ease;pointer-events:none}
+.count{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-size:12px;opacity:0;pointer-events:none}
 .count.on{opacity:1}
 `;
 
@@ -388,10 +387,6 @@ button:hover{background:rgba(63,63,70,.9)}
     close(true, true);
   }
 
-  function markUsed() {
-    touched = true;
-  }
-
   function flash(btn) {
     const html = btn.innerHTML;
     btn.classList.add('done');
@@ -493,7 +488,7 @@ button:hover{background:rgba(63,63,70,.9)}
     if (drag.onPhoto) {
       view.tx = drag.tx + dx;
       view.ty = drag.ty + dy;
-      markUsed();
+      touched = true;
       apply('none');
     }
   }
@@ -569,7 +564,7 @@ button:hover{background:rgba(63,63,70,.9)}
         const next = Closer.gallery.step(k === 'ArrowLeft' ? -1 : 1);
         if (next) {
           e.preventDefault();
-          markUsed();
+          touched = true;
           Closer.gallery.swapPhoto(next);
           return;
         }
@@ -696,7 +691,7 @@ button:hover{background:rgba(63,63,70,.9)}
   function onWheel(e) {
     if (state !== 'open') return;
     e.preventDefault();
-    markUsed();
+    touched = true;
 
     let dy = e.deltaY;
     if (e.deltaMode === 1) dy *= 16;
@@ -716,13 +711,13 @@ button:hover{background:rgba(63,63,70,.9)}
   /* ---------- 开关 ---------- */
 
   function maybePromptPause() {
-    if (Closer.siteMode() !== 'auto' || touched || performance.now() - openedAt >= 800) return false;
-    if (Closer.wasPausePrompted()) return false;
+    if (Closer.siteMode() !== 'auto' || touched || performance.now() - openedAt >= 800 || Closer.wasPausePrompted())
+      return false;
     promptOpen = true;
     panel.hidden = false;
     infoBtn.setAttribute('aria-expanded', 'true');
     pauseBtn.textContent = Closer.t('pauseOnThisSite');
-    void Closer.markPausePrompted();
+    Closer.markPausePrompted();
     wake();
     return true;
   }
@@ -849,7 +844,7 @@ button:hover{background:rgba(63,63,70,.9)}
       close(true, true);
       if (Closer.isTakeover()) void Closer.noteTakeoverFail();
     };
-    unwatch = Closer.isTakeover() ? Closer.watchFast(base, onIntrude) : Closer.watchLate(base, onIntrude);
+    unwatch = Closer.watchLate(base, onIntrude, Closer.isTakeover());
   }
 
   function fadeOut() {

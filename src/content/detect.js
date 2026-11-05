@@ -21,7 +21,7 @@ const MIN_AREA = 40000; // 原始面积下限，约 200 × 200
 const MIN_SIDE = 48; // 原始短边下限：横幅、分割线、长条
 const SQUARE_MAX = 600; // 正方形小图的上限：二维码、头像几乎都在这条线以下
 
-Closer.judge = function (img) {
+Closer.judge = function (img, opt) {
   // 1 还没解码。懒加载占位符就走这条。
   const nw = img.naturalWidth;
   const nh = img.naturalHeight;
@@ -53,7 +53,7 @@ Closer.judge = function (img) {
   // 9 图片被链接包着：他要去看那个链接指向的东西（商品页、文章），
   //   只有两种例外——链接指向图片本身（我们比裸图跳转更好），或者裸锚点。
   const a = img.closest('a');
-  if (a) {
+  if (a && !opt?.thumbLink) {
     const href = (a.getAttribute('href') || '').trim();
     if (!IMAGE_EXT.test(href) && href !== '#') return false;
   }
@@ -67,7 +67,7 @@ Closer.judge = function (img) {
   if (nw === nh && nw < SQUARE_MAX) return false;
 
   // 12 祖先链上有一块声明了 pointer 语义光标的区域：设计者把它做成了可点区域。
-  if (clickBox(img)) return false;
+  if (!opt?.thumbLink && clickBox(img)) return false;
 
   // 13 页面把它放进了背景层：图自己或某层祖先声明了负 z-index。
   if (behind(img)) return false;
@@ -76,21 +76,6 @@ Closer.judge = function (img) {
   return true;
 };
 
-/**
- * 这一下点的是哪张图。
- *
- * 多数时候 target 就在图里，closest 一次就够；但图上方常盖着一层透明装饰
- * （图库的致谢遮罩、卡片的悬停层），点击落在装饰上，target 与图毫无关系。
- * 光看事件目标，这整类站点会表现为「点了没反应」，而页面自己什么也没做。
- * 那种情况只能用命中点栈把图找回来。
- *
- * 四条边界：
- *   1. 点中的东西自己在做事（链接、控件）就不接管——那是页面的意图，不是看这张图。
- *   2. 图必须和点击落在同一块地方：往上找共同祖先，body / html 不算；
- *      否则点浮层、点页头会把下面任意一张图拽出来。
- *   3. 命中栈不穿 shadow，图被做进 Web Component 时要逐层下钻（见 fromPoint）。
- *   4. 找回来的图若铺满视口宽度，它是版面的底，不是被盖住的那张图（见 fullBleed）。
- */
 Closer.pick = function (target, x, y) {
   if (!(target instanceof Element)) return null;
 

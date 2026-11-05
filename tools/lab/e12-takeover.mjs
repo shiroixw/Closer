@@ -89,6 +89,7 @@ window.chrome = {
 <script src="/js/overlay.js"></script>
 <script src="/js/actions.js"></script>
 <script src="/js/hint.js"></script>
+<script src="/js/page-bridge.js"></script>
 <script src="/js/boot.js"></script>
 `;
 
@@ -99,6 +100,8 @@ img{width:240px;display:block}
 .viewer{position:fixed;inset:0;z-index:99999;background:#000;display:grid;place-items:center}
 </style>
 <img id="thumb" src="/img.png">
+<img id="wiki" src="/img.png" style="width:240px">
+<a id="wikilink" href="/wiki/File:Sample.jpg"><img id="wikiin" src="/img.png" style="width:240px;cursor:pointer"></a>
 <img id="s2" src="/img.png" style="width:240px">
 <div id="gal"><img class="g" src="/img.png"><img class="g" src="/img.png"><img class="g" src="/img.png"></div>
 <script>
@@ -108,6 +111,12 @@ document.getElementById('thumb').addEventListener('click',()=>{
 });
 document.getElementById('thumb').addEventListener('pointerdown',()=>{
   const d=document.createElement('div'); d.className='viewer';
+  d.innerHTML='<img src="/img.png">'; document.body.appendChild(d);
+});
+window.__pageZoom = 0;
+document.getElementById('thumb').addEventListener('click',()=>{ window.__pageZoom++; document.getElementById('thumb').style.transform='scale(3)'; });
+document.getElementById('wikiin').addEventListener('click',()=>{
+  const d=document.createElement('div'); d.className='viewer mw-viewer';
   d.innerHTML='<img src="/img.png">'; document.body.appendChild(d);
 });
 </script>
@@ -191,6 +200,18 @@ const t12 = await evalx(`({
 })`);
 check('T1 接管态页面 click 查看器未挂出', t12?.viewers === 0, JSON.stringify(t12));
 check('T2 接管态 overlay 打开', t12?.open === true, JSON.stringify(t12));
+check('T2b 接管态站点 click 缩放未执行', (await evalx('window.__pageZoom')) === 0, String(await evalx('window.__pageZoom')));
+
+// T10 — 维基 File: 缩略图（judge 9/12 误杀）接管态应开
+await evalx(`Closer.overlay?.close?.(true,true); document.getElementById('closer')?.remove(); document.querySelectorAll('.viewer').forEach(n=>n.remove()); window.__pageZoom=0`);
+await evalx(`window.__store['closer:takeover']=['127.0.0.1']; Closer.state.takeover=true`);
+await evalx(`(() => {
+  const img=document.getElementById('wikiin'); const r=img.getBoundingClientRect();
+  img.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));
+})()`);
+await sleep(450);
+const t10 = await evalx(`({ open: Closer.overlay.isOpen(), mw: document.querySelectorAll('.mw-viewer').length })`);
+check('T10 维基 File 链缩略图接管态我们开', t10?.open === true && t10?.mw === 0, JSON.stringify(t10));
 
 // T5 — Esc 后模式不变
 await evalx(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);

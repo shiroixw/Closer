@@ -230,29 +230,25 @@ Closer.covered = function (b) {
  *
  * 不需要记那一层：它挂上之后就是页面自己的顶层，下一次点击由 shelled() 读到。
  */
-Closer.watchLate = function (b, onIntrude) {
-  const timers = [600, 1200].map((ms) =>
-    setTimeout(() => {
-      if (!Closer.covered(b)) return;
-      onIntrude();
-    }, ms)
-  );
-  return () => timers.forEach((t) => clearTimeout(t));
-};
-
-// 接管态：页面在 pointerdown 里挂层时，下一帧 / 80 ms 内快退（plan §3.3）。
-Closer.watchFast = function (b, onIntrude) {
-  let done = false;
+Closer.watchLate = function (b, onIntrude, fast) {
   const run = () => {
-    if (done) return;
     if (!Closer.covered(b)) return;
-    done = true;
     onIntrude();
   };
-  requestAnimationFrame(run);
-  const t = setTimeout(run, 100);
-  return () => {
-    done = true;
-    clearTimeout(t);
-  };
+  if (fast) {
+    let done = false;
+    const once = () => {
+      if (done) return;
+      done = true;
+      run();
+    };
+    requestAnimationFrame(once);
+    const t = setTimeout(once, 100);
+    return () => {
+      done = true;
+      clearTimeout(t);
+    };
+  }
+  const timers = [600, 1200].map((ms) => setTimeout(run, ms));
+  return () => timers.forEach((t) => clearTimeout(t));
 };

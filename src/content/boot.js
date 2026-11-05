@@ -30,6 +30,17 @@ var Closer = (window.Closer ||= {});
 
   const DRAG_SLOP = 6; // 位移超过 6 px 是在拖，不是在点
   const HOLD_MS = 600; // 按住超过 600 ms 是在读，不是在点
+  const WIKI_FILE = /\/wiki\/File:|title=File:/i;
+
+  function passOpen(img) {
+    if (Closer.judge(img)) return true;
+    if (!Closer.isTakeover()) return false;
+    const a = img.closest('a');
+    if (!a) return false;
+    const h = (a.getAttribute('href') || '').trim();
+    if (!WIKI_FILE.test(h) && !h.startsWith('#/media/') && h !== '#') return false;
+    return Closer.judge(img, { thumbLink: true });
+  }
 
   function idle() {
     return Closer.state.ready && !Closer.isPaused() && !Closer.overlay.isOpen();
@@ -53,7 +64,22 @@ var Closer = (window.Closer ||= {});
     } catch {
       /* 拿不到选区就当没有，按第二条偏向打开 */
     }
-    down = { x: e.clientX, y: e.clientY, t: e.timeStamp, sel };
+    const target = e.composedPath()[0];
+    const img = Closer.pick(target, e.clientX, e.clientY);
+    let skinBase = null;
+    let stopEl = null;
+    if (Closer.isTakeover() && img && passOpen(img)) {
+      stopEl = img;
+      stopEl.setAttribute('data-closer-stop', '');
+    }
+    down = { x: e.clientX, y: e.clientY, t: e.timeStamp, sel, stopEl };
+  }
+
+  function clearStop(el) {
+    if (!el) return;
+    const run = () => el.removeAttribute('data-closer-stop');
+    queueMicrotask(run);
+    setTimeout(run, 0);
   }
 
   function shouldYield(img, force) {
@@ -81,23 +107,30 @@ var Closer = (window.Closer ||= {});
 
     const target = e.composedPath()[0];
     const img = Closer.pick(target, e.clientX, e.clientY);
-    if (!img || !Closer.judge(img)) return;
+    if (!img || !passOpen(img)) {
+      clearStop(d?.stopEl);
+      return;
+    }
 
     if (shouldYield(img, force)) {
+      clearStop(d?.stopEl);
       if (!force && Closer.siteMode() === 'auto') Closer.state.lastYield = true;
       return;
     }
 
     Closer.hint?.reset?.();
 
-    const base = Closer.snapshot(e.clientX, e.clientY, img);
     const intercept = Closer.isTakeover() || force;
+    if (intercept) img.setAttribute('data-closer-stop', '');
+
+    const base = Closer.snapshot(e.clientX, e.clientY, img);
     if (intercept) {
       e.stopImmediatePropagation();
     }
     e.preventDefault();
 
     settle(() => {
+      clearStop(img);
       if (!Closer.acted(base)) Closer.overlay.open(img, base);
     });
   }

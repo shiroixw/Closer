@@ -133,7 +133,6 @@ Closer.noteTakeoverFail = function () {
 };
 
 Closer.pauseHere = () => Closer.setSiteMode('paused');
-Closer.resumeHere = () => Closer.setSiteMode('auto');
 Closer.markPausePrompted = function () {
   Closer.state.pausePromptedHere = true;
 };
