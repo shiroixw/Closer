@@ -152,5 +152,43 @@
   },
   "saveFailed": {
     "message": "Save failed"
+  },
+
+  "modeLabel": {
+    "message": "This site"
+  },
+  "modeAuto": {
+    "message": "Auto"
+  },
+  "modeTakeover": {
+    "message": "Take over"
+  },
+  "modePaused": {
+    "message": "Paused"
+  },
+  "modeAutoHint": {
+    "message": "Opens images on pages without a viewer; steps aside where there is one."
+  },
+  "yieldBack": {
+    "message": "Hand back to the page"
+  },
+  "yieldedNote": {
+    "message": "This page has its own viewer — Closer stepped aside."
+  },
+  "takeoverBlocked": {
+    "message": "This page won't let go — back to stepping aside."
+  },
+  "galleryCount": {
+    "message": "$I$ / $N$",
+    "placeholders": {
+      "i": {
+        "content": "$1",
+        "example": "3"
+      },
+      "n": {
+        "content": "$2",
+        "example": "12"
+      }
+    }
   }
 }

@@ -1,10 +1,8 @@
 'use strict';
 
-// popup 跑在扩展页面，不是 content script，所以不共享 window.Closer。
-// 只有两个 key，直接读，不引抽象层。
-
 const ALL = { origins: ['*://*/*'] };
 const PAUSED_KEY = 'closer:paused';
+const TAKEOVER_KEY = 'closer:takeover';
 const PREFS_KEY = 'closer:prefs';
 
 const $ = (id) => document.getElementById(id);
@@ -12,22 +10,38 @@ const statusText = $('statusText');
 const statusDot = document.querySelector('#status .dot');
 const permRow = $('permRow');
 const hostEl = $('host');
-const pauseBtn = $('pause');
+const modeHint = $('modeHint');
 
 let host = '';
 let paused = [];
+let takeover = [];
 let granted = false;
 
 const strip = (h) => (h || '').replace(/^www\./i, '').toLowerCase();
 const covers = (entry, h) => !!entry && !!h && (h === entry || h.endsWith('.' + entry));
+
+function siteMode() {
+  if (paused.some((e) => covers(e, host))) return 'paused';
+  if (takeover.some((e) => covers(e, host))) return 'takeover';
+  return 'auto';
+}
 
 async function activeHost() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     return strip(new URL(tab.url).hostname);
   } catch {
-    return ''; // chrome:// 等页面没有可解析的 URL
+    return '';
   }
+}
+
+function paintMode() {
+  const m = siteMode();
+  for (const b of document.querySelectorAll('#siteMode button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.m === m));
+    b.disabled = !host;
+  }
+  modeHint.textContent = m === 'auto' ? t('modeAutoHint') : '';
 }
 
 function paint() {
@@ -35,16 +49,15 @@ function paint() {
   statusText.textContent = granted ? t('statusOn') : t('statusOff');
   permRow.hidden = granted;
 
-  const isPaused = paused.some((e) => covers(e, host));
   hostEl.textContent = host || t('thisPage');
-  hostEl.title = host; // 窄窗里会被截断成省略号，完整站点名留在 tooltip 上
-  pauseBtn.textContent = isPaused ? t('resume') : t('pause');
-  pauseBtn.disabled = !host;
+  hostEl.title = host;
+  paintMode();
 }
 
 async function load() {
-  const got = await chrome.storage.local.get([PAUSED_KEY, PREFS_KEY]);
+  const got = await chrome.storage.local.get([PAUSED_KEY, TAKEOVER_KEY, PREFS_KEY]);
   paused = Array.isArray(got[PAUSED_KEY]) ? got[PAUSED_KEY] : [];
+  takeover = Array.isArray(got[TAKEOVER_KEY]) ? got[TAKEOVER_KEY] : [];
 
   const prefs = got[PREFS_KEY] || {};
   for (const b of document.querySelectorAll('#backdrop button')) {
@@ -62,7 +75,6 @@ async function load() {
 }
 
 $('perm').addEventListener('click', async () => {
-  // 必须在用户手势里请求，否则 Chrome 直接拒绝
   try {
     granted = await chrome.permissions.request(ALL);
   } catch {
@@ -71,14 +83,15 @@ $('perm').addEventListener('click', async () => {
   paint();
 });
 
-pauseBtn.addEventListener('click', async () => {
-  if (!host) return;
-  const isPaused = paused.some((e) => covers(e, host));
-
-  if (isPaused) paused = paused.filter((e) => !covers(e, host));
-  else if (!paused.includes(host)) paused.push(host);
-
-  await chrome.storage.local.set({ [PAUSED_KEY]: paused });
+$('siteMode').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-m]');
+  if (!b || !host) return;
+  const next = b.dataset.m;
+  paused = paused.filter((entry) => !covers(entry, host));
+  takeover = takeover.filter((entry) => !covers(entry, host));
+  if (next === 'paused') paused.push(host);
+  else if (next === 'takeover') takeover.push(host);
+  await chrome.storage.local.set({ [PAUSED_KEY]: paused, [TAKEOVER_KEY]: takeover });
   paint();
 });
 

@@ -6,6 +6,7 @@
 //   3. 首次安装时打开 welcome
 
 const SCRIPT_ID = 'closer-content';
+const LEGACY_BRIDGE_ID = 'closer-page-bridge';
 
 // 加载顺序即执行顺序，不能调换：core 建命名空间，boot 最后接线。
 const FILES = [
@@ -14,6 +15,7 @@ const FILES = [
   'src/content/yield.js',
   'src/content/meta.js',
   'src/content/bytes.js',
+  'src/content/gallery.js',
   'src/content/overlay.js',
   'src/content/actions.js',
   'src/content/hint.js',
@@ -22,11 +24,7 @@ const FILES = [
 
 const ALL_ORIGINS = { origins: ['*://*/*'] };
 
-// canvas 上限约 16384 px/边，再大的图复制必然失败，不如根本不传输。
-// 与 src/content/bytes.js 的同名常量是一件事，改一处必须改另一处（无构建，无法共享）。
 const MAX_BYTES = 64 * 1024 * 1024;
-
-/* ---------- 注册 ---------- */
 
 async function granted() {
   try {
@@ -46,32 +44,31 @@ async function registered() {
 }
 
 async function sync() {
-  const [has, hasScript] = await Promise.all([granted(), registered()]);
+  const has = await granted();
 
-  if (has && !hasScript) {
-    try {
-      await chrome.scripting.registerContentScripts([
-        {
-          id: SCRIPT_ID,
-          matches: ['*://*/*'],
-          js: FILES,
-          runAt: 'document_start',
-          allFrames: false, // iframe 里的 overlay 会被裁掉，不如不做
-          persistAcrossSessions: true,
-        },
-      ]);
-    } catch (e) {
-      console.warn('[closer] register failed', e);
-    }
-    return;
+  try {
+    await chrome.scripting
+      .unregisterContentScripts({ ids: [SCRIPT_ID, LEGACY_BRIDGE_ID] })
+      .catch(() => {});
+  } catch {
+    /* ignore */
   }
 
-  if (!has && hasScript) {
-    try {
-      await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] });
-    } catch (e) {
-      console.warn('[closer] unregister failed', e);
-    }
+  if (!has) return;
+
+  try {
+    await chrome.scripting.registerContentScripts([
+      {
+        id: SCRIPT_ID,
+        matches: ['*://*/*'],
+        js: FILES,
+        runAt: 'document_start',
+        allFrames: false,
+        persistAcrossSessions: true,
+      },
+    ]);
+  } catch (e) {
+    console.warn('[closer] register failed', e);
   }
 }
 
@@ -89,7 +86,7 @@ chrome.permissions.onRemoved.addListener(sync);
 /* ---------- 字节通道 ---------- */
 
 function toBase64(bytes) {
-  const CHUNK = 0x8000; // 一次 32 KB，避免 apply 的实参上限
+  const CHUNK = 0x8000;
   let out = '';
   for (let i = 0; i < bytes.length; i += CHUNK) {
     out += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
@@ -97,15 +94,9 @@ function toBase64(bytes) {
   return btoa(out);
 }
 
-/**
- * 取一张图的字节。
- * want='meta' 只数字节（流式，不缓冲）；want='full' 连内容一起回（base64）。
- * ArrayBuffer 过不了 runtime 消息（走 JSON 序列化会变成 {}），所以内容必须转 base64。
- */
 async function readBytes(url, want) {
   let res;
   try {
-    // 带上凭证：签名图、登录后的图都依赖 cookie，否则永远拿不到大小。
     res = await fetch(url, { credentials: 'include', cache: 'force-cache' });
   } catch {
     return { ok: false, error: 'network' };
@@ -117,7 +108,6 @@ async function readBytes(url, want) {
   const declared = Number(res.headers.get('content-length') || 0);
 
   if (want === 'meta') {
-    // 有 content-length 就不读了，省一次完整下载。
     if (declared > 0) return { ok: true, size: declared, mime };
 
     if (!res.body) return { ok: true, size: 0, mime };
@@ -132,11 +122,9 @@ async function readBytes(url, want) {
     return { ok: true, size, mime };
   }
 
-  // 先看声明长度：为了拒绝一张图而先下载 64 MB，等于把拒绝的代价付了两遍。
   if (declared > MAX_BYTES) return { ok: true, size: declared, mime, tooBig: true };
 
   const bytes = new Uint8Array(await res.arrayBuffer());
-  // 头可以撒谎或者缺失，读了之后必须再判一次
   if (bytes.byteLength > MAX_BYTES) {
     return { ok: true, size: bytes.byteLength, mime, tooBig: true };
   }
@@ -150,7 +138,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     readBytes(msg.url, msg.want === 'full' ? 'full' : 'meta')
       .then(sendResponse)
       .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    return true; // 异步响应
+    return true;
   }
 
   if (msg.type === 'closer:status') {

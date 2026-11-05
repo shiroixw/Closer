@@ -112,11 +112,16 @@ Closer.acted = function (b) {
  * 点击与悬停光标都经过这里（都在 judge() 之后），所以两边口径一致：不开，也不给 zoom-in。
  * 三件事都是**此刻的状态**，读一次就知道，不依赖我们刚才看见过什么。
  */
-Closer.shelled = function (img) {
-  if (document.fullscreenElement) return true; // 全屏时我们开了也看不见
-  // 这页上打开过一次却看不见自己（cases 013）：后面每次点击都只会被吃掉，干脆退场。
-  // 一次观测换整页让位，只到刷新为止——它是观测不是猜测，不落进暂停列表，也不跨页。
+Closer.blind = function () {
+  if (document.fullscreenElement) return true;
   if (Closer.state.unseen) return true;
+  return false;
+};
+
+Closer.onTopLayer = onTopLayer;
+
+Closer.shelled = function (img) {
+  if (Closer.blind()) return true;
   return onTopLayer(img);
 };
 
@@ -225,12 +230,25 @@ Closer.covered = function (b) {
  *
  * 不需要记那一层：它挂上之后就是页面自己的顶层，下一次点击由 shelled() 读到。
  */
-Closer.watchLate = function (b, onIntrude) {
-  const timers = [600, 1200].map((ms) =>
-    setTimeout(() => {
-      if (!Closer.covered(b)) return;
-      onIntrude();
-    }, ms)
-  );
+Closer.watchLate = function (b, onIntrude, fast) {
+  const run = () => {
+    if (!Closer.covered(b)) return;
+    onIntrude();
+  };
+  if (fast) {
+    let done = false;
+    const once = () => {
+      if (done) return;
+      done = true;
+      run();
+    };
+    requestAnimationFrame(once);
+    const t = setTimeout(once, 100);
+    return () => {
+      done = true;
+      clearTimeout(t);
+    };
+  }
+  const timers = [600, 1200].map((ms) => setTimeout(run, ms));
   return () => timers.forEach((t) => clearTimeout(t));
 };
